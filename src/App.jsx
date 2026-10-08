@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { BrowserRouter } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Login from './Login'
 import ResetPassword from './ResetPassword'
@@ -22,7 +23,17 @@ export default function App() {
     return () => listener.subscription.unsubscribe()
   }, [])
 
-  if (!ready) return <p>Đang tải...</p>
-  if (recovery && session) return <ResetPassword onDone={() => setRecovery(false)} />
-  return session ? <Dashboard session={session} /> : <Login />
+  if (!ready) return <div className="app-boot">Đang tải…</div>
+
+  return (
+    <BrowserRouter>
+      {recovery && session ? (
+        <ResetPassword onDone={() => setRecovery(false)} />
+      ) : session ? (
+        <Dashboard session={session} />
+      ) : (
+        <Login />
+      )}
+    </BrowserRouter>
+  )
 }

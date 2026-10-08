@@ -1,91 +1,321 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import {
+  ArrowLeftRight,
+  Boxes,
+  Cpu,
+  FolderKanban,
+  History,
+  LayoutDashboard,
+  LogOut,
+  MapPin,
+  Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  Search,
+  Settings,
+  Sun,
+} from 'lucide-react'
 import { supabase } from './supabaseClient'
+import useTheme from './useTheme'
+import { APP_VERSION } from './version'
+import { DataProvider, useData } from './data/DataContext'
+import { ToastProvider } from './ui/Toast'
+import { TxProvider, useTx } from './TxContext'
+import { ShellContext } from './ShellContext'
+import Overview from './pages/Overview'
+import ComponentsPage from './pages/Components'
+import ComponentDrawer from './ComponentDrawer'
+import ComponentForm from './ComponentForm'
+import ImportCsvModal from './ImportCsvModal'
+import './auth.css'
+import './dashboard.css'
 
-const emptyForm = { part_number: '', name: '', package: '', min_stock: 0 }
+const COLLAPSE_KEY = 'kho_sidebar_collapsed'
+
+function readCollapsed() {
+  try {
+    return localStorage.getItem(COLLAPSE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+const SOON = [
+  { label: 'Vị trí', Icon: MapPin },
+  { label: 'Dự án và BOM', Icon: FolderKanban },
+  { label: 'Lịch sử', Icon: History },
+  { label: 'Cài đặt', Icon: Settings },
+]
 
 export default function Dashboard({ session }) {
-  const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [form, setForm] = useState(emptyForm)
+  return (
+    <ToastProvider>
+      <DataProvider>
+        <TxProvider>
+          <Shell session={session} />
+        </TxProvider>
+      </DataProvider>
+    </ToastProvider>
+  )
+}
 
-  async function loadItems() {
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('component_totals')
-      .select('*')
-      .order('part_number')
-    if (error) alert(error.message)
-    else setItems(data)
-    setLoading(false)
-  }
+function Shell({ session }) {
+  const [theme, toggleTheme] = useTheme()
+  const [collapsed, setCollapsed] = useState(readCollapsed)
+  const [form, setForm] = useState(null) // { component: dòng linh kiện | null }
+  const [importing, setImporting] = useState(false)
+  const [params, setParams] = useSearchParams()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { components, refreshing } = useData()
+  const { openTx } = useTx()
 
-  useEffect(() => {
-    loadItems()
-  }, [])
+  const openId = params.get('c')
+  const onComponents = location.pathname.startsWith('/components')
+  const q = params.get('q') ?? ''
+  const attention = useMemo(() => components.filter((c) => c.status !== 'ok').length, [components])
+  const email = session?.user?.email ?? ''
 
-  async function addComponent(e) {
-    e.preventDefault()
-    const { error } = await supabase.from('components').insert({
-      part_number: form.part_number,
-      name: form.name,
-      package: form.package || null,
-      min_stock: Number(form.min_stock),
+  const openComponent = useCallback(
+    (id) =>
+      setParams((prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('c', id)
+        return next
+      }),
+    [setParams],
+  )
+  const closeComponent = useCallback(
+    () =>
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('c')
+          return next
+        },
+        { replace: true },
+      ),
+    [setParams],
+  )
+
+  const shell = useMemo(
+    () => ({
+      openComponent,
+      closeComponent,
+      openForm: (component) => setForm({ component: component ?? null }),
+      openImport: () => setImporting(true),
+    }),
+    [openComponent, closeComponent],
+  )
+
+  function toggleCollapsed() {
+    setCollapsed((c) => {
+      try {
+        localStorage.setItem(COLLAPSE_KEY, c ? '0' : '1')
+      } catch {
+        /* bỏ qua nếu trình duyệt chặn lưu */
+      }
+      return !c
     })
-    if (error) return alert(error.message)
-    setForm(emptyForm)
-    loadItems()
   }
 
-  function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value })
+  function onSearch(value) {
+    if (onComponents) {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          if (value) next.set('q', value)
+          else next.delete('q')
+          return next
+        },
+        { replace: true },
+      )
+    } else {
+      navigate({ pathname: '/components', search: value ? `?q=${encodeURIComponent(value)}` : '' })
+    }
   }
+
+  // Phím tắt: "/" để tìm kiếm, "N" để nhập / xuất nhanh
+  useEffect(() => {
+    function onKey(e) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      const t = e.target
+      const typing = t instanceof HTMLElement && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName))
+      if (typing || document.querySelector('.kk-backdrop')) return
+      if (e.key === '/') {
+        const box = [...document.querySelectorAll('[data-global-search]')].find((el) => el.offsetParent !== null)
+        if (box) {
+          e.preventDefault()
+          box.focus()
+        }
+      } else if (e.key === 'n' || e.key === 'N') {
+        e.preventDefault()
+        openTx({ type: 'in' })
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [openTx])
 
   return (
-    <div className="container">
-      <header>
-        <h1>Kho linh kiện</h1>
-        <div>
-          <span>{session.user.email}</span>
-          <button onClick={() => supabase.auth.signOut()}>Đăng xuất</button>
-        </div>
-      </header>
+    <ShellContext.Provider value={shell}>
+      <div className="kk" data-collapsed={collapsed}>
+        <aside className="kk-side" aria-label="Thanh bên">
+          <div className="kk-side-brand">
+            <span className="kk-logo">
+              <Cpu size={24} />
+            </span>
+            <span className="kk-side-text">Kho Linh Kiện</span>
+          </div>
 
-      <form className="add-form" onSubmit={addComponent}>
-        <input name="part_number" placeholder="Mã linh kiện" value={form.part_number} onChange={handleChange} required />
-        <input name="name" placeholder="Tên" value={form.name} onChange={handleChange} required />
-        <input name="package" placeholder="Package" value={form.package} onChange={handleChange} />
-        <input name="min_stock" type="number" min="0" placeholder="Tồn tối thiểu" value={form.min_stock} onChange={handleChange} />
-        <button>Thêm</button>
-      </form>
+          <nav className="kk-nav" aria-label="Điều hướng chính">
+            <NavLink to="/" end title="Tổng quan">
+              <LayoutDashboard size={20} />
+              <span className="kk-side-text">Tổng quan</span>
+            </NavLink>
+            <NavLink to="/components" title="Linh kiện">
+              <Boxes size={20} />
+              <span className="kk-side-text">Linh kiện</span>
+              {attention > 0 && (
+                <span className="kk-badge" aria-label={`${attention} món sắp hết`}>
+                  {attention}
+                </span>
+              )}
+            </NavLink>
+            <button type="button" onClick={() => openTx({ type: 'in' })} title="Nhập / xuất kho (phím N)">
+              <ArrowLeftRight size={20} />
+              <span className="kk-side-text">Nhập / xuất kho</span>
+            </button>
 
-      {loading ? (
-        <p>Đang tải...</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Mã</th>
-              <th>Tên</th>
-              <th>Package</th>
-              <th>Tồn kho</th>
-              <th>Tối thiểu</th>
-              <th>Trạng thái</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((c) => (
-              <tr key={c.id} className={c.is_low ? 'low' : ''}>
-                <td>{c.part_number}</td>
-                <td>{c.name}</td>
-                <td>{c.package}</td>
-                <td>{c.total_quantity}</td>
-                <td>{c.min_stock}</td>
-                <td>{c.is_low ? 'Sắp hết' : 'Ổn'}</td>
-              </tr>
+            <div className="kk-nav-sep" />
+            {SOON.map(({ label, Icon }) => (
+              <span key={label} className="kk-nav-soon" aria-disabled="true" title={`${label}: sắp có`}>
+                <Icon size={20} />
+                <span className="kk-side-text">{label}</span>
+                <em className="kk-side-text">Sắp có</em>
+              </span>
             ))}
-          </tbody>
-        </table>
+          </nav>
+
+          <div className="kk-side-foot">
+            <button
+              type="button"
+              className="kk-collapse"
+              onClick={toggleCollapsed}
+              aria-label={collapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'}
+              title={collapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'}
+            >
+              {collapsed ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />}
+              <span className="kk-side-text">Thu gọn</span>
+            </button>
+            <span className="kk-version kk-side-text">{APP_VERSION}</span>
+          </div>
+        </aside>
+
+        <div className="kk-main">
+          <header className="kk-top">
+            <span className="kk-top-brand">
+              <span className="kk-logo kk-logo-sm">
+                <Cpu size={20} />
+              </span>
+              Kho Linh Kiện
+            </span>
+
+            <div className="kk-search kk-search-top">
+              <Search size={18} aria-hidden="true" />
+              <input
+                data-global-search
+                type="search"
+                value={onComponents ? q : ''}
+                placeholder="Tìm linh kiện"
+                aria-label="Tìm linh kiện"
+                onChange={(e) => onSearch(e.target.value)}
+              />
+              <kbd aria-hidden="true">/</kbd>
+            </div>
+
+            <div className="kk-top-actions">
+              <button type="button" className="kk-btn kk-btn-primary kk-top-tx" onClick={() => openTx({ type: 'in' })}>
+                <Plus size={18} />
+                Nhập / xuất
+                <kbd aria-hidden="true">N</kbd>
+              </button>
+              <button
+                type="button"
+                className="kk-icon-btn kk-icon-btn-boxed"
+                onClick={toggleTheme}
+                aria-label="Đổi giao diện sáng/tối"
+                title="Đổi giao diện sáng/tối"
+              >
+                {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+              </button>
+              <div className="kk-account">
+                <span className="kk-avatar" aria-hidden="true">
+                  {(email[0] ?? '?').toUpperCase()}
+                </span>
+                <span className="kk-account-mail" title={email}>
+                  {email}
+                </span>
+                <button
+                  type="button"
+                  className="kk-icon-btn kk-icon-btn-boxed"
+                  onClick={() => supabase.auth.signOut()}
+                  aria-label="Đăng xuất"
+                  title="Đăng xuất"
+                >
+                  <LogOut size={18} />
+                </button>
+              </div>
+            </div>
+            {refreshing && <div className="kk-pulsebar" role="status" aria-label="Đang cập nhật dữ liệu" />}
+          </header>
+
+          <main className="kk-content">
+            <Routes>
+              <Route path="/" element={<Overview />} />
+              <Route path="/components" element={<ComponentsPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </main>
+        </div>
+
+        <nav className="kk-tabbar" aria-label="Điều hướng trên điện thoại">
+          <NavLink to="/" end>
+            <LayoutDashboard size={22} />
+            <span>Tổng quan</span>
+          </NavLink>
+          <NavLink to="/components">
+            <Boxes size={22} />
+            <span>Linh kiện</span>
+            {attention > 0 && <i className="kk-tab-dot" aria-label={`${attention} món sắp hết`} />}
+          </NavLink>
+          <button type="button" className="kk-fab" onClick={() => openTx({ type: 'in' })} aria-label="Nhập / xuất kho">
+            <Plus size={28} />
+          </button>
+          <button type="button" onClick={toggleTheme}>
+            {theme === 'light' ? <Moon size={22} /> : <Sun size={22} />}
+            <span>Giao diện</span>
+          </button>
+          <button type="button" onClick={() => supabase.auth.signOut()}>
+            <LogOut size={22} />
+            <span>Đăng xuất</span>
+          </button>
+        </nav>
+      </div>
+
+      {openId && <ComponentDrawer key={openId} id={openId} onClose={closeComponent} />}
+      {form && (
+        <ComponentForm
+          initial={form.component}
+          onClose={() => setForm(null)}
+          onSaved={(id) => {
+            if (!form.component) openComponent(id)
+          }}
+        />
       )}
-    </div>
+      {importing && <ImportCsvModal onClose={() => setImporting(false)} />}
+    </ShellContext.Provider>
   )
 }
