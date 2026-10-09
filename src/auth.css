@@ -271,6 +271,14 @@
   padding: 0;
   accent-color: var(--primary);
 }
+.row:has(+ .keep-row) { margin-bottom: 10px; }
+.keep-row { margin: 0 0 18px; font-size: 0.88rem; }
+.keep-row p {
+  margin: 4px 0 0 24px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
 .link-btn {
   margin: 0;
   padding: 0;

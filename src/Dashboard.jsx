@@ -19,7 +19,7 @@ import {
   Settings,
   Sun,
 } from 'lucide-react'
-import { supabase } from './supabaseClient'
+import { signOutHere, supabase } from './supabaseClient'
 import useTheme from './useTheme'
 import { APP_VERSION } from './version'
 import { DataProvider, useData } from './data/DataContext'
@@ -303,7 +303,7 @@ function Shell({ session, profile, reloadProfile }) {
                 <button
                   type="button"
                   className="kk-icon-btn kk-icon-btn-boxed"
-                  onClick={() => supabase.auth.signOut()}
+                  onClick={signOutHere}
                   aria-label="Đăng xuất"
                   title="Đăng xuất"
                 >
@@ -371,7 +371,7 @@ function Shell({ session, profile, reloadProfile }) {
               {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
               {theme === 'light' ? 'Chuyển sang giao diện tối' : 'Chuyển sang giao diện sáng'}
             </button>
-            <button type="button" onClick={() => supabase.auth.signOut()}>
+            <button type="button" onClick={signOutHere}>
               <LogOut size={20} />
               Đăng xuất
             </button>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AlertCircle, Clock, Loader2, LogOut, RefreshCw, ShieldOff } from 'lucide-react'
-import { supabase } from './supabaseClient'
+import { signOutHere } from './supabaseClient'
 import AuthLayout from './AuthLayout'
 
 const COPY = {
@@ -56,7 +56,7 @@ export default function WaitingRoom({ variant, name, email, error, onRefresh }) 
         </button>
       )}
       <div className="back-row">
-        <button type="button" className="link-btn" onClick={() => supabase.auth.signOut()}>
+        <button type="button" className="link-btn" onClick={signOutHere}>
           <LogOut size={16} /> Đăng xuất
         </button>
       </div>

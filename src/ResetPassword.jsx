@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Lock, Loader2, AlertCircle, CheckCircle2, LogOut } from 'lucide-react'
-import { supabase } from './supabaseClient'
+import { signOutHere, supabase } from './supabaseClient'
 import AuthLayout from './AuthLayout'
 import { NewPasswordFields } from './ui/password'
 import { passwordProblems, setRecoveryPending, translateAuthError } from './lib/auth'
@@ -71,7 +71,7 @@ export default function ResetPassword({ onDone }) {
         </button>
       </form>
       <div className="back-row">
-        <button type="button" className="link-btn" onClick={() => supabase.auth.signOut()}>
+        <button type="button" className="link-btn" onClick={signOutHere}>
           <LogOut size={16} /> Để sau và đăng xuất
         </button>
       </div>

@@ -62,10 +62,11 @@ export function translateAuthError(error) {
   return `Có lỗi xảy ra: ${message}`
 }
 
-/* ---- Đang ở giữa bước đặt lại mật khẩu: nhớ lại để tải lại trang không bị bỏ qua bước này ---- */
+/* ---- Đang ở giữa bước đặt lại mật khẩu: nhớ lại để tải lại trang không bị bỏ qua bước này ----
+   Lưu theo từng tab (sessionStorage), vì mỗi tab có thể đang đăng nhập một tài khoản khác nhau. */
 export function isRecoveryPending() {
   try {
-    return localStorage.getItem(RECOVERY_KEY) === '1'
+    return sessionStorage.getItem(RECOVERY_KEY) === '1'
   } catch {
     return false
   }
@@ -73,8 +74,8 @@ export function isRecoveryPending() {
 
 export function setRecoveryPending(on) {
   try {
-    if (on) localStorage.setItem(RECOVERY_KEY, '1')
-    else localStorage.removeItem(RECOVERY_KEY)
+    if (on) sessionStorage.setItem(RECOVERY_KEY, '1')
+    else sessionStorage.removeItem(RECOVERY_KEY)
   } catch {
     /* bỏ qua nếu trình duyệt chặn lưu */
   }

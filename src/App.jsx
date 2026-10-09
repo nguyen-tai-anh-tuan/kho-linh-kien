@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { BrowserRouter } from 'react-router-dom'
-import { authLanding, supabase } from './supabaseClient'
+import { authLanding, resetAfterSignOut, supabase } from './supabaseClient'
 import { isRecoveryPending, setRecoveryPending } from './lib/auth'
 import { friendlyError, isMissingSchema } from './lib/api'
 import { canEnter } from './lib/roles'
@@ -34,6 +34,7 @@ export default function App() {
       } else if (event === 'SIGNED_OUT') {
         setRecoveryPending(false)
         setRecovery(false)
+        if (resetAfterSignOut()) window.location.reload()
       }
     })
     return () => listener.subscription.unsubscribe()
