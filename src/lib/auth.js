@@ -34,6 +34,15 @@ export function translateAuthError(error) {
   const m = message.toLowerCase()
   if (m.includes('invalid login credentials')) return 'Sai email hoặc mật khẩu. Bạn kiểm tra lại nhé.'
   if (m.includes('email not confirmed')) return 'Tài khoản này chưa được xác nhận email.'
+  if (code === 'user_already_exists' || code === 'email_exists' || m.includes('already registered')) {
+    return 'Email này đã có tài khoản. Hãy đăng nhập, hoặc dùng "Quên mật khẩu?" nếu bạn không nhớ mật khẩu.'
+  }
+  if (code === 'signup_disabled' || m.includes('signups not allowed')) {
+    return 'Trang chưa mở đăng ký tài khoản mới. Hãy báo admin bật lại trong Supabase.'
+  }
+  if (code === 'email_address_invalid' || m.includes('invalid format') || m.includes('is invalid')) {
+    return 'Email này không dùng được. Bạn kiểm tra lại địa chỉ nhé.'
+  }
   if (code === 'same_password' || m.includes('different from the old password')) {
     return 'Mật khẩu mới phải khác mật khẩu đang dùng.'
   }

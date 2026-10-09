@@ -26,6 +26,7 @@ import { DataProvider, useData } from './data/DataContext'
 import { ToastProvider } from './ui/Toast'
 import { TxProvider, useTx } from './TxContext'
 import { ShellContext } from './ShellContext'
+import { canEdit, isAdmin, roleLabel } from './lib/roles'
 import Overview from './pages/Overview'
 import ComponentsPage from './pages/Components'
 import LocationsPage from './pages/Locations'
@@ -59,19 +60,19 @@ const MORE_PAGES = [
 const TAB_PAGE = MORE_PAGES[0]
 const SHEET_PAGES = MORE_PAGES.slice(1)
 
-export default function Dashboard({ session }) {
+export default function Dashboard({ session, profile, reloadProfile }) {
   return (
     <ToastProvider>
       <DataProvider>
         <TxProvider>
-          <Shell session={session} />
+          <Shell session={session} profile={profile} reloadProfile={reloadProfile} />
         </TxProvider>
       </DataProvider>
     </ToastProvider>
   )
 }
 
-function Shell({ session }) {
+function Shell({ session, profile, reloadProfile }) {
   const [theme, toggleTheme] = useTheme()
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [form, setForm] = useState(null) // { component: dòng linh kiện | null }
@@ -80,7 +81,7 @@ function Shell({ session }) {
   const [params, setParams] = useSearchParams()
   const location = useLocation()
   const navigate = useNavigate()
-  const { components, refreshing } = useData()
+  const { components, refreshing, version } = useData()
   const { openTx } = useTx()
 
   const openId = params.get('c')
@@ -89,6 +90,20 @@ function Shell({ session }) {
   const q = params.get('q') ?? ''
   const attention = useMemo(() => components.filter((c) => c.status !== 'ok').length, [components])
   const email = session?.user?.email ?? ''
+  const displayName = profile.display_name || email
+  const mayEdit = canEdit(profile.role)
+  const admin = isAdmin(profile.role)
+
+  // Số tài khoản đang chờ duyệt, để admin thấy ngay trên thanh bên
+  const [pendingCount, setPendingCount] = useState(0)
+  const refreshPending = useCallback(async () => {
+    if (!admin || profile.legacy) return
+    const { count } = await supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'pending')
+    setPendingCount(count ?? 0)
+  }, [admin, profile.legacy])
+  useEffect(() => {
+    refreshPending()
+  }, [refreshPending, version])
 
   const openComponent = useCallback(
     (id) =>
@@ -119,8 +134,14 @@ function Shell({ session }) {
       openForm: (component) => setForm({ component: component ?? null }),
       openImport: () => setImporting(true),
       email,
+      profile,
+      reloadProfile,
+      canEdit: mayEdit,
+      isAdmin: admin,
+      pendingCount,
+      refreshPending,
     }),
-    [openComponent, closeComponent, email],
+    [openComponent, closeComponent, email, profile, reloadProfile, mayEdit, admin, pendingCount, refreshPending],
   )
 
   function toggleCollapsed() {
@@ -163,14 +184,14 @@ function Shell({ session }) {
           e.preventDefault()
           box.focus()
         }
-      } else if (e.key === 'n' || e.key === 'N') {
+      } else if (mayEdit && (e.key === 'n' || e.key === 'N')) {
         e.preventDefault()
         openTx({ type: 'in' })
       }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [openTx])
+  }, [openTx, mayEdit])
 
   return (
     <ShellContext.Provider value={shell}>
@@ -197,16 +218,23 @@ function Shell({ session }) {
                 </span>
               )}
             </NavLink>
-            <button type="button" onClick={() => openTx({ type: 'in' })} title="Nhập / xuất kho (phím N)">
-              <ArrowLeftRight size={20} />
-              <span className="kk-side-text">Nhập / xuất kho</span>
-            </button>
+            {mayEdit && (
+              <button type="button" onClick={() => openTx({ type: 'in' })} title="Nhập / xuất kho (phím N)">
+                <ArrowLeftRight size={20} />
+                <span className="kk-side-text">Nhập / xuất kho</span>
+              </button>
+            )}
 
             <div className="kk-nav-sep" />
             {MORE_PAGES.map(({ to, label, Icon }) => (
               <NavLink key={to} to={to} title={label}>
                 <Icon size={20} />
                 <span className="kk-side-text">{label}</span>
+                {to === '/settings' && pendingCount > 0 && (
+                  <span className="kk-badge" aria-label={`${pendingCount} tài khoản chờ duyệt`}>
+                    {pendingCount}
+                  </span>
+                )}
               </NavLink>
             ))}
           </nav>
@@ -249,11 +277,13 @@ function Shell({ session }) {
             </div>
 
             <div className="kk-top-actions">
-              <button type="button" className="kk-btn kk-btn-primary kk-top-tx" onClick={() => openTx({ type: 'in' })}>
-                <Plus size={18} />
-                Nhập / xuất
-                <kbd aria-hidden="true">N</kbd>
-              </button>
+              {mayEdit && (
+                <button type="button" className="kk-btn kk-btn-primary kk-top-tx" onClick={() => openTx({ type: 'in' })}>
+                  <Plus size={18} />
+                  Nhập / xuất
+                  <kbd aria-hidden="true">N</kbd>
+                </button>
+              )}
               <button
                 type="button"
                 className="kk-icon-btn kk-icon-btn-boxed"
@@ -265,10 +295,10 @@ function Shell({ session }) {
               </button>
               <div className="kk-account">
                 <span className="kk-avatar" aria-hidden="true">
-                  {(email[0] ?? '?').toUpperCase()}
+                  {(displayName[0] ?? '?').toUpperCase()}
                 </span>
-                <span className="kk-account-mail" title={email}>
-                  {email}
+                <span className="kk-account-mail" title={`${email} (${roleLabel(profile.role)})`}>
+                  {displayName}
                 </span>
                 <button
                   type="button"
@@ -297,7 +327,7 @@ function Shell({ session }) {
           </main>
         </div>
 
-        <nav className="kk-tabbar" aria-label="Điều hướng trên điện thoại">
+        <nav className={`kk-tabbar ${mayEdit ? '' : 'kk-tabbar-4'}`} aria-label="Điều hướng trên điện thoại">
           <NavLink to="/" end>
             <LayoutDashboard size={22} />
             <span>Tổng quan</span>
@@ -307,9 +337,11 @@ function Shell({ session }) {
             <span>Linh kiện</span>
             {attention > 0 && <i className="kk-tab-dot" aria-label={`${attention} món sắp hết`} />}
           </NavLink>
-          <button type="button" className="kk-fab" onClick={() => openTx({ type: 'in' })} aria-label="Nhập / xuất kho">
-            <Plus size={28} />
-          </button>
+          {mayEdit && (
+            <button type="button" className="kk-fab" onClick={() => openTx({ type: 'in' })} aria-label="Nhập / xuất kho">
+              <Plus size={28} />
+            </button>
+          )}
           <NavLink to={TAB_PAGE.to}>
             <TAB_PAGE.Icon size={22} />
             <span>{TAB_PAGE.label}</span>
@@ -322,7 +354,7 @@ function Shell({ session }) {
       </div>
 
       {menuOpen && (
-        <Modal title="Mục khác" subtitle={email} onClose={() => setMenuOpen(false)}>
+        <Modal title="Mục khác" subtitle={`${displayName}, ${roleLabel(profile.role)}`} onClose={() => setMenuOpen(false)}>
           <nav className="kk-menu" aria-label="Các trang khác">
             {SHEET_PAGES.map(({ to, label, Icon }) => (
               <NavLink key={to} to={to} onClick={() => setMenuOpen(false)}>

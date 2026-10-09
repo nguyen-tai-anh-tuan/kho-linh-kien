@@ -23,7 +23,7 @@ import { fmtDay, fmtMoney, fmtMoneyFull, fmtNum, greeting, timeAgo } from '../li
 export default function Overview() {
   const { components, categories, toneByCategory, loading, refreshing, error, reload, version } = useData()
   const { openTx } = useTx()
-  const { openComponent, openForm } = useShell()
+  const { openComponent, openForm, canEdit } = useShell()
 
   /* ---- số liệu tổng hợp ---- */
   const stats = useMemo(() => {
@@ -107,11 +107,16 @@ export default function Overview() {
   }
   if (components.length === 0) {
     return (
-      <EmptyState title="Chưa có linh kiện nào" text="Thêm món đầu tiên của bạn nhé. Bạn cũng có thể nhập cả danh sách từ file CSV.">
-        <button type="button" className="kk-btn kk-btn-primary" onClick={() => openForm(null)}>
-          <PackagePlus size={18} />
-          Thêm linh kiện
-        </button>
+      <EmptyState
+        title="Chưa có linh kiện nào"
+        text={canEdit ? 'Thêm món đầu tiên của bạn nhé. Bạn cũng có thể nhập cả danh sách từ file CSV.' : 'Kho đang trống. Khi có người thêm linh kiện, bạn sẽ thấy ở đây.'}
+      >
+        {canEdit && (
+          <button type="button" className="kk-btn kk-btn-primary" onClick={() => openForm(null)}>
+            <PackagePlus size={18} />
+            Thêm linh kiện
+          </button>
+        )}
       </EmptyState>
     )
   }
@@ -125,20 +130,22 @@ export default function Overview() {
           <h1>{greeting()} 👋</h1>
           <p>Đây là tình hình kho của bạn.</p>
         </div>
-        <div className="kk-quick">
-          <button type="button" className="kk-btn kk-btn-primary" onClick={() => openTx({ type: 'in' })}>
-            <ArrowDownToLine size={18} />
-            Nhập kho
-          </button>
-          <button type="button" className="kk-btn kk-btn-outline" onClick={() => openTx({ type: 'out' })}>
-            <ArrowUpFromLine size={18} />
-            Xuất kho
-          </button>
-          <button type="button" className="kk-btn kk-btn-outline" onClick={() => openForm(null)}>
-            <PackagePlus size={18} />
-            Thêm linh kiện
-          </button>
-        </div>
+        {canEdit && (
+          <div className="kk-quick">
+            <button type="button" className="kk-btn kk-btn-primary" onClick={() => openTx({ type: 'in' })}>
+              <ArrowDownToLine size={18} />
+              Nhập kho
+            </button>
+            <button type="button" className="kk-btn kk-btn-outline" onClick={() => openTx({ type: 'out' })}>
+              <ArrowUpFromLine size={18} />
+              Xuất kho
+            </button>
+            <button type="button" className="kk-btn kk-btn-outline" onClick={() => openForm(null)}>
+              <PackagePlus size={18} />
+              Thêm linh kiện
+            </button>
+          </div>
+        )}
       </div>
 
       <section className="kk-stats" aria-label="Số liệu tổng quan">
@@ -253,14 +260,19 @@ export default function Overview() {
                     <ActivityIcon type={t.type} />
                     <span className="kk-list-main">
                       <span>{describeTx(t)}</span>
-                      <small>{timeAgo(t.created_at)}</small>
+                      <small>
+                        {timeAgo(t.created_at)}
+                        {t.actor_name ? `, bởi ${t.actor_name}` : ''}
+                      </small>
                     </span>
                   </button>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="kk-muted-text">Chưa có giao dịch nào. Thử nhập kho món đầu tiên nhé.</p>
+            <p className="kk-muted-text">
+              {canEdit ? 'Chưa có giao dịch nào. Thử nhập kho món đầu tiên nhé.' : 'Chưa có giao dịch nào.'}
+            </p>
           )}
         </div>
       </section>

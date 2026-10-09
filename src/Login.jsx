@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2, ArrowLeft } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2, ArrowLeft, User } from 'lucide-react'
 import { supabase } from './supabaseClient'
 import AuthLayout from './AuthLayout'
-import { markResetSent, resetCooldownLeft, translateAuthError } from './lib/auth'
+import { NewPasswordFields } from './ui/password'
+import { markResetSent, passwordProblems, resetCooldownLeft, translateAuthError } from './lib/auth'
 
 const EMAIL_KEY = 'kho_last_email'
 
@@ -20,9 +21,12 @@ const LINK_EXPIRED = 'Link đặt lại mật khẩu đã hết hạn hoặc đ�
 
 /** linkExpired: người dùng vừa bấm một link đặt lại mật khẩu không còn dùng được */
 export default function Login({ linkExpired = false }) {
-  const [mode, setMode] = useState(linkExpired ? 'forgot' : 'login') // 'login' | 'forgot'
+  const [mode, setMode] = useState(linkExpired ? 'forgot' : 'login') // 'login' | 'forgot' | 'signup'
   const [email, setEmail] = useState(getSavedEmail)
   const [password, setPassword] = useState('')
+  const [name, setName] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [submitted, setSubmitted] = useState(false)
   const [remember, setRemember] = useState(true)
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -31,6 +35,7 @@ export default function Login({ linkExpired = false }) {
   const [wait, setWait] = useState(resetCooldownLeft) // số giây còn phải đợi trước khi gửi lại email
   const emailRef = useRef(null)
   const passRef = useRef(null)
+  const nameRef = useRef(null)
 
   const waiting = wait > 0
   useEffect(() => {
@@ -41,7 +46,8 @@ export default function Login({ linkExpired = false }) {
 
   // Tự đặt con trỏ: nếu đã nhớ email thì nhảy thẳng vào ô mật khẩu
   useEffect(() => {
-    if (mode === 'login' && email) passRef.current?.focus()
+    if (mode === 'signup') nameRef.current?.focus()
+    else if (mode === 'login' && email) passRef.current?.focus()
     else emailRef.current?.focus()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
@@ -50,6 +56,42 @@ export default function Login({ linkExpired = false }) {
     setMode(next)
     setError('')
     setInfo('')
+    setPassword('')
+    setConfirm('')
+    setSubmitted(false)
+  }
+
+  async function handleSignup(e) {
+    e.preventDefault()
+    if (loading) return
+    setSubmitted(true)
+    setError('')
+    const cleanName = name.trim()
+    const cleanEmail = email.trim()
+    const problems = passwordProblems(password, confirm)
+    if (!cleanName) return setError('Hãy nhập tên hiển thị để mọi người biết bạn là ai.')
+    if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) return setError('Email chưa đúng định dạng.')
+    if (problems.password || problems.confirm) return
+
+    setLoading(true)
+    const { data, error } = await supabase.auth.signUp({
+      email: cleanEmail,
+      password,
+      options: { data: { display_name: cleanName }, emailRedirectTo: window.location.origin },
+    })
+    if (error) {
+      setLoading(false)
+      return setError(translateAuthError(error))
+    }
+    // Có phiên ngay (Supabase không bắt xác nhận email): App tự chuyển sang màn chờ admin duyệt
+    if (data.session) return
+    setLoading(false)
+    // Email đã có tài khoản: Supabase trả về người dùng "giả" không có danh tính nào
+    if (data.user && data.user.identities?.length === 0) {
+      return setError('Email này đã có tài khoản. Hãy đăng nhập, hoặc dùng "Quên mật khẩu?" nếu bạn không nhớ mật khẩu.')
+    }
+    switchMode('login')
+    setInfo('Đã tạo tài khoản. Hãy bấm link xác nhận trong email (xem cả mục Spam), rồi quay lại đăng nhập.')
   }
 
   async function handleLogin(e) {
@@ -119,6 +161,52 @@ export default function Login({ linkExpired = false }) {
       )}
     </>
   )
+
+  if (mode === 'signup') {
+    return (
+      <AuthLayout>
+        <h2 className="auth-title">Tạo tài khoản</h2>
+        <p className="auth-sub">Sau khi tạo, admin sẽ duyệt và cấp quyền để bạn vào kho.</p>
+        <form onSubmit={handleSignup} noValidate>
+          <div className="field">
+            <label htmlFor="display-name">Tên hiển thị</label>
+            <div className="input-wrap">
+              <User className="ico" size={18} />
+              <input
+                id="display-name"
+                ref={nameRef}
+                type="text"
+                placeholder="Vd: Anh Tuấn"
+                autoComplete="name"
+                maxLength={60}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+          </div>
+          {emailField}
+          <NewPasswordFields
+            idPrefix="su"
+            password={password}
+            confirm={confirm}
+            onPassword={setPassword}
+            onConfirm={setConfirm}
+            submitted={submitted}
+            Icon={Lock}
+          />
+          {messages}
+          <button className="btn-primary" disabled={loading}>
+            {loading ? <><Loader2 size={18} className="spin" /> Đang tạo...</> : 'Tạo tài khoản'}
+          </button>
+        </form>
+        <div className="back-row">
+          <button type="button" className="link-btn" onClick={() => switchMode('login')}>
+            <ArrowLeft size={16} /> Đã có tài khoản? Đăng nhập
+          </button>
+        </div>
+      </AuthLayout>
+    )
+  }
 
   if (mode === 'forgot') {
     return (
@@ -201,6 +289,12 @@ export default function Login({ linkExpired = false }) {
           {loading ? <><Loader2 size={18} className="spin" /> Đang đăng nhập...</> : 'Đăng nhập'}
         </button>
       </form>
+      <div className="back-row">
+        Chưa có tài khoản?{' '}
+        <button type="button" className="link-btn" onClick={() => switchMode('signup')}>
+          Tạo tài khoản
+        </button>
+      </div>
     </AuthLayout>
   )
 }

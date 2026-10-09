@@ -29,8 +29,10 @@ export function friendlyError(error) {
   const low = msg.toLowerCase()
 
   if (msg.includes('NO_ROWS_CHANGED')) {
-    return 'Chưa có gì được thay đổi. Mục này có thể đã bị xóa, hoặc tài khoản chưa được cấp quyền sửa/xóa trong Supabase.'
+    return 'Chưa có gì được thay đổi. Mục này có thể đã bị xóa, hoặc vai trò của bạn không được phép làm việc này.'
   }
+  if (msg.includes('LAST_ADMIN')) return 'Kho phải còn ít nhất một admin. Hãy cho người khác làm admin trước.'
+  if (msg.includes('NOT_ADMIN')) return 'Chỉ admin mới làm được việc này.'
 
   if (msg.includes('INSUFFICIENT_STOCK')) {
     const detail = error?.details ? ` (${error.details})` : ''
@@ -42,7 +44,7 @@ export function friendlyError(error) {
   if (code === '23505') return 'Dữ liệu bị trùng với một mục đã có.'
   if (code === '23514') return 'Giá trị nhập vào không hợp lệ (ví dụ số lượng phải lớn hơn 0).'
   if (code === '42501' || low.includes('row-level security') || low.includes('permission denied')) {
-    return 'Bạn chưa có quyền thực hiện thao tác này. Hãy đăng xuất rồi đăng nhập lại.'
+    return 'Vai trò của bạn không được phép làm việc này. Nếu cần, hãy nhờ admin cấp thêm quyền.'
   }
   if (low.includes('failed to fetch') || low.includes('networkerror') || low.includes('load failed')) {
     return 'Không kết nối được máy chủ. Hãy kiểm tra mạng rồi thử lại.'

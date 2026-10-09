@@ -2360,7 +2360,7 @@ button.kk-tree-toggle:hover {
 .kk-rows li.kk-rows-plain {
   padding-right: 96px;
 }
-.kk-rows-plain .kk-rows-name {
+.kk-rows-muted .kk-rows-name {
   font-weight: 500;
   color: var(--muted);
 }
@@ -2385,6 +2385,68 @@ button.kk-tree-toggle:hover {
 .kk-toolbar-flat {
   margin-bottom: 12px;
   padding: 0;
+}
+/* Thành viên */
+.kk-members li {
+  flex-wrap: wrap;
+  padding: 8px 0;
+}
+.kk-members li.is-pending {
+  margin: 0 -10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border-bottom-color: transparent;
+  background: var(--kk-warn-bg);
+}
+.kk-members .kk-avatar {
+  flex: none;
+}
+.kk-members .kk-rows-name {
+  flex: 1 1 180px;
+}
+.kk-members .kk-rows-name small {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.kk-members select {
+  width: 150px !important;
+}
+.kk-you {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--kk-soft);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 700;
+  color: var(--muted);
+}
+.kk-members-error {
+  margin: 0 0 10px;
+}
+.kk-role-help {
+  display: grid;
+  gap: 4px;
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--kk-soft);
+  list-style: none;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+.kk-name-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  max-width: 420px;
+}
+.kk-name-form .kk-field {
+  flex: 1 1 200px;
 }
 .kk-account-form {
   display: grid;
@@ -2458,6 +2520,10 @@ button.kk-tree-toggle:hover {
 @media (max-width: 860px) {
   .kk-tabbar button.active {
     color: var(--kk-link);
+  }
+  /* Người chỉ xem không có nút nhập/xuất ở giữa */
+  .kk-tabbar.kk-tabbar-4 {
+    grid-template-columns: repeat(4, 1fr);
   }
   .kk-tree-toggle {
     width: 40px;

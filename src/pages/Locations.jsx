@@ -19,7 +19,7 @@ const levelName = (depth) => LEVELS[Math.min(depth, LEVELS.length - 1)]
 export default function LocationsPage() {
   const { locations, locationsById, componentsById, stock, loading, refreshing, error, reload } = useData()
   const { openTx } = useTx()
-  const { openComponent } = useShell()
+  const { openComponent, canEdit, isAdmin } = useShell()
   const toast = useToast()
   const [params, setParams] = useSearchParams()
   const [collapsed, setCollapsed] = useState(() => new Set())
@@ -166,12 +166,14 @@ export default function LocationsPage() {
           <h1>Vị trí</h1>
           <p>{loading ? 'Đang tải…' : `${fmtNum(locations.length)} vị trí, sắp theo tủ, ngăn, hộc`}</p>
         </div>
-        <div className="kk-quick">
-          <button type="button" className="kk-btn kk-btn-primary" onClick={() => setDialog({ kind: 'add', loc: null })}>
-            <Plus size={18} />
-            Thêm tủ
-          </button>
-        </div>
+        {canEdit && (
+          <div className="kk-quick">
+            <button type="button" className="kk-btn kk-btn-primary" onClick={() => setDialog({ kind: 'add', loc: null })}>
+              <Plus size={18} />
+              Thêm tủ
+            </button>
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -183,12 +185,18 @@ export default function LocationsPage() {
         <div className="kk-card">
           <EmptyState
             title="Chưa có vị trí nào"
-            text="Tạo tủ đầu tiên, rồi thêm ngăn và hộc bên trong để biết từng món đang nằm ở đâu."
+            text={
+              canEdit
+                ? 'Tạo tủ đầu tiên, rồi thêm ngăn và hộc bên trong để biết từng món đang nằm ở đâu.'
+                : 'Kho chưa có tủ, ngăn hay hộc nào.'
+            }
           >
-            <button type="button" className="kk-btn kk-btn-primary" onClick={() => setDialog({ kind: 'add', loc: null })}>
-              <Plus size={18} />
-              Thêm tủ
-            </button>
+            {canEdit && (
+              <button type="button" className="kk-btn kk-btn-primary" onClick={() => setDialog({ kind: 'add', loc: null })}>
+                <Plus size={18} />
+                Thêm tủ
+              </button>
+            )}
           </EmptyState>
         </div>
       ) : (
@@ -245,43 +253,47 @@ export default function LocationsPage() {
                       : `${fmtNum(rows.length)} dòng, tổng ${fmtNum(totalQty)} cái`}
                   </p>
                 </div>
-                <div className="kk-pane-actions">
-                  <button
-                    type="button"
-                    className="kk-btn kk-btn-primary kk-btn-sm"
-                    onClick={() => openTx({ type: 'in', locationId: selected.id })}
-                  >
-                    <ArrowDownToLine size={16} />
-                    Nhập vào đây
-                  </button>
-                  <button
-                    type="button"
-                    className="kk-btn kk-btn-outline kk-btn-sm"
-                    onClick={() => setDialog({ kind: 'add', loc: selected })}
-                  >
-                    <FolderPlus size={16} />
-                    Thêm {levelName(selected.depth + 1)}
-                  </button>
-                  <button
-                    type="button"
-                    className="kk-icon-btn kk-icon-btn-boxed"
-                    aria-label={`Đổi tên ${selected.name}`}
-                    title="Đổi tên"
-                    onClick={() => setDialog({ kind: 'rename', loc: selected })}
-                  >
-                    <Pencil size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    className="kk-icon-btn kk-icon-btn-boxed"
-                    aria-label={`Xóa ${selected.name}`}
-                    title={deleteBlocked || 'Xóa vị trí'}
-                    disabled={Boolean(deleteBlocked)}
-                    onClick={() => setDialog({ kind: 'delete', loc: selected })}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+                {canEdit && (
+                  <div className="kk-pane-actions">
+                    <button
+                      type="button"
+                      className="kk-btn kk-btn-primary kk-btn-sm"
+                      onClick={() => openTx({ type: 'in', locationId: selected.id })}
+                    >
+                      <ArrowDownToLine size={16} />
+                      Nhập vào đây
+                    </button>
+                    <button
+                      type="button"
+                      className="kk-btn kk-btn-outline kk-btn-sm"
+                      onClick={() => setDialog({ kind: 'add', loc: selected })}
+                    >
+                      <FolderPlus size={16} />
+                      Thêm {levelName(selected.depth + 1)}
+                    </button>
+                    <button
+                      type="button"
+                      className="kk-icon-btn kk-icon-btn-boxed"
+                      aria-label={`Đổi tên ${selected.name}`}
+                      title="Đổi tên"
+                      onClick={() => setDialog({ kind: 'rename', loc: selected })}
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        className="kk-icon-btn kk-icon-btn-boxed"
+                        aria-label={`Xóa ${selected.name}`}
+                        title={deleteBlocked || 'Xóa vị trí'}
+                        disabled={Boolean(deleteBlocked)}
+                        onClick={() => setDialog({ kind: 'delete', loc: selected })}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {selectedKids.length > 0 && (
@@ -303,14 +315,16 @@ export default function LocationsPage() {
                       : 'Chưa có món nào ở vị trí này.'
                   }
                 >
-                  <button
-                    type="button"
-                    className="kk-btn kk-btn-primary"
-                    onClick={() => openTx({ type: 'in', locationId: selected.id })}
-                  >
-                    <ArrowDownToLine size={18} />
-                    Nhập vào đây
-                  </button>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      className="kk-btn kk-btn-primary"
+                      onClick={() => openTx({ type: 'in', locationId: selected.id })}
+                    >
+                      <ArrowDownToLine size={18} />
+                      Nhập vào đây
+                    </button>
+                  )}
                 </EmptyState>
               ) : (
                 <div className="kk-table-scroll">

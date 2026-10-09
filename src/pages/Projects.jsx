@@ -32,6 +32,7 @@ function analyse(lines, builds, componentsById) {
 
 export default function ProjectsPage() {
   const { projects, componentsById, loading, refreshing, error, reload, version } = useData()
+  const { canEdit } = useShell()
   const [params, setParams] = useSearchParams()
   const [bom, setBom] = useState(null) // null: đang tải, { error, missing }: lỗi, mảng: các dòng BOM
   const [attempt, setAttempt] = useState(0)
@@ -89,12 +90,14 @@ export default function ProjectsPage() {
           <h1>Dự án và BOM</h1>
           <p>{loading ? 'Đang tải…' : `${fmtNum(projects.length)} dự án`}</p>
         </div>
-        <div className="kk-quick">
-          <button type="button" className="kk-btn kk-btn-primary" onClick={() => setDialog({ kind: 'form', project: null })}>
-            <Plus size={18} />
-            Thêm dự án
-          </button>
-        </div>
+        {canEdit && (
+          <div className="kk-quick">
+            <button type="button" className="kk-btn kk-btn-primary" onClick={() => setDialog({ kind: 'form', project: null })}>
+              <Plus size={18} />
+              Thêm dự án
+            </button>
+          </div>
+        )}
       </div>
 
       {loading || bom === null ? (
@@ -121,12 +124,18 @@ export default function ProjectsPage() {
         <div className="kk-card">
           <EmptyState
             title="Chưa có dự án nào"
-            text="Tạo dự án, liệt kê linh kiện cần cho một bộ sản phẩm, rồi xuất kho cả danh sách chỉ bằng một lần bấm."
+            text={
+              canEdit
+                ? 'Tạo dự án, liệt kê linh kiện cần cho một bộ sản phẩm, rồi xuất kho cả danh sách chỉ bằng một lần bấm.'
+                : 'Khi có người tạo dự án và BOM, bạn sẽ thấy ở đây.'
+            }
           >
-            <button type="button" className="kk-btn kk-btn-primary" onClick={() => setDialog({ kind: 'form', project: null })}>
-              <Plus size={18} />
-              Thêm dự án
-            </button>
+            {canEdit && (
+              <button type="button" className="kk-btn kk-btn-primary" onClick={() => setDialog({ kind: 'form', project: null })}>
+                <Plus size={18} />
+                Thêm dự án
+              </button>
+            )}
           </EmptyState>
         </div>
       ) : (
@@ -189,7 +198,7 @@ export default function ProjectsPage() {
 /* ------------------------------------------------------------------ */
 function ProjectDetail({ project, lines, setBom, refetchBom, onEdit, onDelete }) {
   const { componentsById } = useData()
-  const { openComponent } = useShell()
+  const { openComponent, canEdit, isAdmin } = useShell()
   const toast = useToast()
   const [builds, setBuilds] = useState(1)
   const [addId, setAddId] = useState(null)
@@ -278,14 +287,18 @@ function ProjectDetail({ project, lines, setBom, refetchBom, onEdit, onDelete })
           <h2>{project.name}</h2>
           {project.description && <p className="kk-card-sub">{project.description}</p>}
         </div>
-        <div className="kk-pane-actions">
-          <button type="button" className="kk-icon-btn kk-icon-btn-boxed" aria-label="Sửa dự án" title="Sửa dự án" onClick={onEdit}>
-            <Pencil size={16} />
-          </button>
-          <button type="button" className="kk-icon-btn kk-icon-btn-boxed" aria-label="Xóa dự án" title="Xóa dự án" onClick={onDelete}>
-            <Trash2 size={16} />
-          </button>
-        </div>
+        {canEdit && (
+          <div className="kk-pane-actions">
+            <button type="button" className="kk-icon-btn kk-icon-btn-boxed" aria-label="Sửa dự án" title="Sửa dự án" onClick={onEdit}>
+              <Pencil size={16} />
+            </button>
+            {isAdmin && (
+              <button type="button" className="kk-icon-btn kk-icon-btn-boxed" aria-label="Xóa dự án" title="Xóa dự án" onClick={onDelete}>
+                <Trash2 size={16} />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {rows.length > 0 && (
@@ -310,16 +323,21 @@ function ProjectDetail({ project, lines, setBom, refetchBom, onEdit, onDelete })
                 Tải danh sách thiếu
               </button>
             )}
-            <button type="button" className="kk-btn kk-btn-primary kk-btn-sm" onClick={() => setExporting(true)}>
-              <ArrowUpFromLine size={16} />
-              Xuất kho theo BOM
-            </button>
+            {canEdit && (
+              <button type="button" className="kk-btn kk-btn-primary kk-btn-sm" onClick={() => setExporting(true)}>
+                <ArrowUpFromLine size={16} />
+                Xuất kho theo BOM
+              </button>
+            )}
           </div>
         </div>
       )}
 
       {rows.length === 0 ? (
-        <EmptyState title="BOM còn trống" text="Thêm các linh kiện cần cho một bộ sản phẩm của dự án này ở ngay bên dưới." />
+        <EmptyState
+          title="BOM còn trống"
+          text={canEdit ? 'Thêm các linh kiện cần cho một bộ sản phẩm của dự án này ở ngay bên dưới.' : 'Dự án này chưa có linh kiện nào trong BOM.'}
+        />
       ) : (
         <div className="kk-table-scroll">
           <table className="kk-table kk-table-plain kk-table-static">
@@ -330,9 +348,11 @@ function ProjectDetail({ project, lines, setBom, refetchBom, onEdit, onDelete })
                 <th className="is-num">Tổng cần</th>
                 <th className="is-num">Tồn kho</th>
                 <th>Tình trạng</th>
-                <th className="kk-col-act">
-                  <span className="kk-sr">Thao tác</span>
-                </th>
+                {canEdit && (
+                  <th className="kk-col-act">
+                    <span className="kk-sr">Thao tác</span>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -345,15 +365,19 @@ function ProjectDetail({ project, lines, setBom, refetchBom, onEdit, onDelete })
                     <span className="kk-cell-name">{r.comp.name}</span>
                   </td>
                   <td data-label="Mỗi bộ cần">
-                    <div className="kk-cell-stepper">
-                      <QtyStepper
-                        value={r.line.quantity}
-                        min={1}
-                        invalid={!(Number(r.line.quantity) >= 1)}
-                        label={`Số lượng ${r.comp.part_number} cho mỗi bộ`}
-                        onChange={(v) => changeQty(r.line, v)}
-                      />
-                    </div>
+                    {canEdit ? (
+                      <div className="kk-cell-stepper">
+                        <QtyStepper
+                          value={r.line.quantity}
+                          min={1}
+                          invalid={!(Number(r.line.quantity) >= 1)}
+                          label={`Số lượng ${r.comp.part_number} cho mỗi bộ`}
+                          onChange={(v) => changeQty(r.line, v)}
+                        />
+                      </div>
+                    ) : (
+                      <span className="kk-strong-num">{fmtNum(r.per)}</span>
+                    )}
                   </td>
                   <td data-label="Tổng cần" className="is-num kk-strong-num">
                     {fmtNum(r.need)}
@@ -374,17 +398,19 @@ function ProjectDetail({ project, lines, setBom, refetchBom, onEdit, onDelete })
                       </span>
                     )}
                   </td>
-                  <td className="kk-col-act">
-                    <button
-                      type="button"
-                      className="kk-icon-btn"
-                      aria-label={`Bỏ ${r.comp.part_number} khỏi BOM`}
-                      title="Bỏ khỏi BOM"
-                      onClick={() => removeLine(r)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
+                  {canEdit && (
+                    <td className="kk-col-act">
+                      <button
+                        type="button"
+                        className="kk-icon-btn"
+                        aria-label={`Bỏ ${r.comp.part_number} khỏi BOM`}
+                        title="Bỏ khỏi BOM"
+                        onClick={() => removeLine(r)}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -392,6 +418,7 @@ function ProjectDetail({ project, lines, setBom, refetchBom, onEdit, onDelete })
         </div>
       )}
 
+      {canEdit && (
       <div className="kk-bom-add">
         <Field label="Thêm linh kiện vào BOM" htmlFor="bom-add-comp" className="kk-bom-add-comp">
           <ComponentPicker
@@ -416,6 +443,7 @@ function ProjectDetail({ project, lines, setBom, refetchBom, onEdit, onDelete })
           </p>
         )}
       </div>
+      )}
 
       {exporting && <BomExportModal project={project} rows={counted} builds={n} onClose={() => setExporting(false)} />}
     </section>

@@ -44,7 +44,7 @@ function applyFilters(query, f) {
 export default function HistoryPage() {
   const { locations, projects, version } = useData()
   const { openTx } = useTx()
-  const { openComponent } = useShell()
+  const { openComponent, canEdit } = useShell()
   const toast = useToast()
   const [params, setParams] = useSearchParams()
   const [state, setState] = useState({ status: 'loading', rows: [], count: 0, error: '' })
@@ -111,7 +111,7 @@ export default function HistoryPage() {
     setExporting(true)
     try {
       const all = await fetchAll(() => applyFilters(supabase.from('transactions_feed').select('*'), filters))
-      const header = ['thoi_gian', 'loai', 'part_number', 'ten', 'so_luong', 'thay_doi', 'vi_tri', 'du_an', 'ghi_chu']
+      const header = ['thoi_gian', 'loai', 'part_number', 'ten', 'so_luong', 'thay_doi', 'vi_tri', 'du_an', 'nguoi_thuc_hien', 'ghi_chu']
       const body = all.map((t) => [
         fmtDateTime(t.created_at),
         TYPES[t.type]?.label ?? t.type,
@@ -121,6 +121,7 @@ export default function HistoryPage() {
         t.delta,
         t.location_path,
         t.project_name,
+        t.actor_name,
         t.note,
       ])
       downloadCSV(`lich-su-kho-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...body])
@@ -230,10 +231,12 @@ export default function HistoryPage() {
             </EmptyState>
           ) : (
             <EmptyState title="Chưa có giao dịch nào" text="Mỗi lần nhập, xuất hay kiểm kê sẽ được ghi lại ở đây.">
-              <button type="button" className="kk-btn kk-btn-primary" onClick={() => openTx({ type: 'in' })}>
-                <ArrowDownToLine size={18} />
-                Nhập kho
-              </button>
+              {canEdit && (
+                <button type="button" className="kk-btn kk-btn-primary" onClick={() => openTx({ type: 'in' })}>
+                  <ArrowDownToLine size={18} />
+                  Nhập kho
+                </button>
+              )}
             </EmptyState>
           )
         ) : (
@@ -248,6 +251,7 @@ export default function HistoryPage() {
                     <th className="is-num">Số lượng</th>
                     <th>Vị trí</th>
                     <th>Dự án</th>
+                    <th>Người thực hiện</th>
                     <th>Ghi chú</th>
                   </tr>
                 </thead>
@@ -283,6 +287,7 @@ export default function HistoryPage() {
                         </td>
                         <td data-label="Vị trí">{t.location_path || '—'}</td>
                         <td data-label="Dự án">{t.project_name || '—'}</td>
+                        <td data-label="Người thực hiện">{t.actor_name || '—'}</td>
                         <td data-label="Ghi chú" className="kk-cell-note">
                           {t.note || '—'}
                         </td>

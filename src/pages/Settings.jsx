@@ -10,12 +10,13 @@ import { EmptyState, Field, QtyStepper, Skeleton, StatusChip } from '../ui/commo
 import { friendlyError, mustChange } from '../lib/api'
 import { fmtNum, normalize } from '../lib/format'
 import SettingsAccount from './SettingsAccount'
+import SettingsMembers from './SettingsMembers'
 
 const MAX_ROWS = 50
 
 export default function SettingsPage() {
   const { components, categories, toneByCategory, searchText, loading, refreshing, error, reload, createCategory } = useData()
-  const { openComponent } = useShell()
+  const { openComponent, isAdmin, profile } = useShell()
   const toast = useToast()
   const [dialog, setDialog] = useState(null) // { kind: 'add' | 'rename' | 'delete' | 'bulk', category }
 
@@ -113,9 +114,24 @@ export default function SettingsPage() {
       <div className="kk-page-head">
         <div>
           <h1>Cài đặt</h1>
-          <p>Quản lý danh mục và mức cảnh báo sắp hết hàng.</p>
+          <p>
+            {isAdmin
+              ? 'Quản lý danh mục, mức cảnh báo sắp hết hàng và thành viên.'
+              : 'Xem danh mục, mức cảnh báo và quản lý tài khoản của bạn. Chỉ admin mới sửa được danh mục và mức cảnh báo.'}
+          </p>
         </div>
       </div>
+
+      {isAdmin && profile.legacy && (
+        <p className="kk-banner kk-banner-warn" role="status">
+          <BellRing size={18} aria-hidden="true" />
+          <span>
+            Chưa bật phân quyền: hiện ai đăng nhập được cũng có toàn quyền. Mở Supabase, vào SQL Editor, dán nội dung file
+            sql/04_roles.sql rồi bấm Run, sau đó tải lại trang.
+          </span>
+        </p>
+      )}
+      {isAdmin && !profile.legacy && <SettingsMembers />}
 
       {/* ---- Danh mục ---- */}
       <section className="kk-card" aria-labelledby="set-cat">
@@ -124,10 +140,12 @@ export default function SettingsPage() {
             <h2 id="set-cat">Danh mục linh kiện</h2>
             <p className="kk-card-sub">Các loại dùng để phân nhóm, lọc và vẽ biểu đồ tồn kho.</p>
           </div>
-          <button type="button" className="kk-btn kk-btn-soft kk-btn-sm" onClick={() => setDialog({ kind: 'add' })}>
-            <Plus size={16} />
-            Thêm loại
-          </button>
+          {isAdmin && (
+            <button type="button" className="kk-btn kk-btn-soft kk-btn-sm" onClick={() => setDialog({ kind: 'add' })}>
+              <Plus size={16} />
+              Thêm loại
+            </button>
+          )}
         </div>
         {loading ? (
           <div className="kk-skel-list">
@@ -146,29 +164,33 @@ export default function SettingsPage() {
                   <i className={`kk-dot kk-tone-${toneByCategory.get(c.id) ?? 'x'}`} aria-hidden="true" />
                   <span className="kk-rows-name">{c.name}</span>
                   <span className="kk-rows-meta">{fmtNum(count)} linh kiện</span>
-                  <button
-                    type="button"
-                    className="kk-icon-btn"
-                    aria-label={`Đổi tên loại ${c.name}`}
-                    title="Đổi tên"
-                    onClick={() => setDialog({ kind: 'rename', category: c })}
-                  >
-                    <Pencil size={16} />
-                  </button>
-                  <button
-                    type="button"
-                    className="kk-icon-btn"
-                    aria-label={`Xóa loại ${c.name}`}
-                    title="Xóa loại"
-                    onClick={() => setDialog({ kind: 'delete', category: c, count })}
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {isAdmin && (
+                    <>
+                      <button
+                        type="button"
+                        className="kk-icon-btn"
+                        aria-label={`Đổi tên loại ${c.name}`}
+                        title="Đổi tên"
+                        onClick={() => setDialog({ kind: 'rename', category: c })}
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        className="kk-icon-btn"
+                        aria-label={`Xóa loại ${c.name}`}
+                        title="Xóa loại"
+                        onClick={() => setDialog({ kind: 'delete', category: c, count })}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </>
+                  )}
                 </li>
               )
             })}
             {(countByCategory.get('none') ?? 0) > 0 && (
-              <li className="kk-rows-plain">
+              <li className={`kk-rows-muted ${isAdmin ? 'kk-rows-plain' : ''}`}>
                 <i className="kk-dot kk-tone-x" aria-hidden="true" />
                 <span className="kk-rows-name">Chưa phân loại</span>
                 <span className="kk-rows-meta">{fmtNum(countByCategory.get('none'))} linh kiện</span>
@@ -190,6 +212,8 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {isAdmin && (
+          <>
         <h3 className="kk-sub kk-sub-first">Đặt nhanh cho cả nhóm</h3>
         <div className="kk-bulk-form">
           <Field label="Áp dụng cho" htmlFor="set-scope">
@@ -229,8 +253,10 @@ export default function SettingsPage() {
               : 'Nhóm này chưa có linh kiện nào.'}
           </p>
         )}
+          </>
+        )}
 
-        <h3 className="kk-sub">Sửa từng linh kiện</h3>
+        <h3 className={`kk-sub ${isAdmin ? '' : 'kk-sub-first'}`}>{isAdmin ? 'Sửa từng linh kiện' : 'Mức của từng linh kiện'}</h3>
         <div className="kk-toolbar kk-toolbar-flat">
           <div className="kk-search">
             <Search size={18} aria-hidden="true" />
@@ -238,7 +264,7 @@ export default function SettingsPage() {
               type="search"
               value={q}
               placeholder="Tìm theo mã, tên, loại…"
-              aria-label="Tìm linh kiện để sửa mức cảnh báo"
+              aria-label="Tìm linh kiện để xem mức cảnh báo"
               onChange={(e) => setQ(e.target.value)}
             />
           </div>
@@ -286,7 +312,11 @@ export default function SettingsPage() {
                         <StatusChip status={c.status} />
                       </td>
                       <td data-label="Mức cảnh báo">
-                        <MinStockInput key={`${c.id}|${c.min_stock}`} component={c} onSave={saveMin} />
+                        {isAdmin ? (
+                          <MinStockInput key={`${c.id}|${c.min_stock}`} component={c} onSave={saveMin} />
+                        ) : (
+                          <span className="kk-strong-num">{c.min_stock > 0 ? fmtNum(c.min_stock) : 'Chưa đặt'}</span>
+                        )}
                       </td>
                     </tr>
                   ))}

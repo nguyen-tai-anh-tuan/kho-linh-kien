@@ -25,7 +25,7 @@ const TYPE_LABEL = { in: 'Nhập', out: 'Xuất', adjust: 'Điều chỉnh' }
 export default function ComponentDrawer({ id, onClose }) {
   const { componentsById, stockByComponent, toneByCategory, loading, version, reload } = useData()
   const { openTx } = useTx()
-  const { openForm } = useShell()
+  const { openForm, canEdit, isAdmin } = useShell()
   const toast = useToast()
   const c = componentsById.get(id)
 
@@ -93,7 +93,7 @@ export default function ComponentDrawer({ id, onClose }) {
       headerExtra={<StatusChip status={c.status} />}
       onClose={onClose}
       footer={
-        confirmDelete ? (
+        !canEdit ? null : confirmDelete ? (
           <>
             <span className="kk-foot-note kk-foot-warn">Xóa {c.part_number}? Không thể hoàn tác.</span>
             <button type="button" className="kk-btn kk-btn-ghost" onClick={() => setConfirmDelete(false)} disabled={deleting}>
@@ -124,10 +124,12 @@ export default function ComponentDrawer({ id, onClose }) {
               <Pencil size={18} />
               Sửa
             </button>
-            <button type="button" className="kk-btn kk-btn-ghost kk-push-right" onClick={() => setConfirmDelete(true)}>
-              <Trash2 size={18} />
-              Xóa
-            </button>
+            {isAdmin && (
+              <button type="button" className="kk-btn kk-btn-ghost kk-push-right" onClick={() => setConfirmDelete(true)}>
+                <Trash2 size={18} />
+                Xóa
+              </button>
+            )}
           </>
         )
       }
@@ -207,7 +209,7 @@ export default function ComponentDrawer({ id, onClose }) {
 
         <h3 className="kk-sub">Tồn theo vị trí</h3>
         {where.length === 0 ? (
-          <p className="kk-muted-text">Chưa có hàng ở vị trí nào. Bấm Nhập để thêm.</p>
+          <p className="kk-muted-text">{canEdit ? 'Chưa có hàng ở vị trí nào. Bấm Nhập để thêm.' : 'Chưa có hàng ở vị trí nào.'}</p>
         ) : (
           <table className="kk-mini-table">
             <thead>
@@ -252,6 +254,7 @@ export default function ComponentDrawer({ id, onClose }) {
                   </span>
                   <small>
                     {timeAgo(t.created_at)}
+                    {t.actor_name ? `, bởi ${t.actor_name}` : ''}
                     {t.note ? `, ${t.note}` : ''}
                   </small>
                 </span>

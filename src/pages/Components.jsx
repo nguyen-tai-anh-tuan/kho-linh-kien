@@ -47,7 +47,7 @@ export default function ComponentsPage() {
     reload,
   } = useData()
   const { openTx } = useTx()
-  const { openComponent, openForm, openImport } = useShell()
+  const { openComponent, openForm, openImport, canEdit } = useShell()
   const [params, setParams] = useSearchParams()
   const [sort, setSort] = useState({ key: 'part_number', dir: 'asc' })
   const [page, setPage] = useState(0)
@@ -195,18 +195,22 @@ export default function ComponentsPage() {
           </p>
         </div>
         <div className="kk-quick">
-          <button type="button" className="kk-btn kk-btn-primary" onClick={() => openForm(null)}>
-            <PackagePlus size={18} />
-            Thêm linh kiện
-          </button>
-          <button type="button" className="kk-btn kk-btn-outline" onClick={() => openTx({ type: 'in' })}>
-            <ArrowDownToLine size={18} />
-            Nhập / xuất kho
-          </button>
-          <button type="button" className="kk-btn kk-btn-outline" onClick={openImport}>
-            <Upload size={18} />
-            Nhập CSV
-          </button>
+          {canEdit && (
+            <>
+              <button type="button" className="kk-btn kk-btn-primary" onClick={() => openForm(null)}>
+                <PackagePlus size={18} />
+                Thêm linh kiện
+              </button>
+              <button type="button" className="kk-btn kk-btn-outline" onClick={() => openTx({ type: 'in' })}>
+                <ArrowDownToLine size={18} />
+                Nhập / xuất kho
+              </button>
+              <button type="button" className="kk-btn kk-btn-outline" onClick={openImport}>
+                <Upload size={18} />
+                Nhập CSV
+              </button>
+            </>
+          )}
           <button type="button" className="kk-btn kk-btn-outline" onClick={exportCsv} disabled={components.length === 0}>
             <Download size={18} />
             Xuất CSV
@@ -266,9 +270,11 @@ export default function ComponentsPage() {
       {selected.size > 0 && (
         <div className="kk-bulk" role="region" aria-label="Thao tác với mục đã chọn">
           <strong>Đã chọn {fmtNum(selected.size)}</strong>
-          <button type="button" className="kk-btn kk-btn-soft kk-btn-sm" onClick={() => openTx({ type: 'in', componentIds: [...selected] })}>
-            Nhập / xuất các mục này
-          </button>
+          {canEdit && (
+            <button type="button" className="kk-btn kk-btn-soft kk-btn-sm" onClick={() => openTx({ type: 'in', componentIds: [...selected] })}>
+              Nhập / xuất các mục này
+            </button>
+          )}
           <button type="button" className="kk-btn kk-btn-soft kk-btn-sm" onClick={exportCsv}>
             <Download size={16} />
             Xuất CSV
@@ -288,15 +294,22 @@ export default function ComponentsPage() {
             ))}
           </div>
         ) : components.length === 0 ? (
-          <EmptyState title="Chưa có linh kiện nào" text="Thêm món đầu tiên của bạn nhé, hoặc nhập cả danh sách từ file CSV.">
-            <button type="button" className="kk-btn kk-btn-primary" onClick={() => openForm(null)}>
-              <PackagePlus size={18} />
-              Thêm linh kiện
-            </button>
-            <button type="button" className="kk-btn kk-btn-outline" onClick={openImport}>
-              <Upload size={18} />
-              Nhập từ CSV
-            </button>
+          <EmptyState
+            title="Chưa có linh kiện nào"
+            text={canEdit ? 'Thêm món đầu tiên của bạn nhé, hoặc nhập cả danh sách từ file CSV.' : 'Kho đang trống. Khi có người thêm linh kiện, bạn sẽ thấy ở đây.'}
+          >
+            {canEdit && (
+              <>
+                <button type="button" className="kk-btn kk-btn-primary" onClick={() => openForm(null)}>
+                  <PackagePlus size={18} />
+                  Thêm linh kiện
+                </button>
+                <button type="button" className="kk-btn kk-btn-outline" onClick={openImport}>
+                  <Upload size={18} />
+                  Nhập từ CSV
+                </button>
+              </>
+            )}
           </EmptyState>
         ) : sorted.length === 0 ? (
           <EmptyState title="Không tìm thấy linh kiện nào" text="Thử đổi từ khóa hoặc bỏ bớt bộ lọc.">

@@ -5,10 +5,65 @@ import { useShell } from '../ShellContext'
 import { useToast } from '../ui/Toast'
 import { NewPasswordFields, PasswordInput } from '../ui/password'
 import { passwordProblems, translateAuthError } from '../lib/auth'
+import { friendlyError, mustChange } from '../lib/api'
+import { roleLabel } from '../lib/roles'
+import { Field } from '../ui/common'
+
+/** Tên hiển thị: tên này hiện ở cột "Người thực hiện" trong lịch sử */
+function DisplayName() {
+  const { profile, reloadProfile } = useShell()
+  const toast = useToast()
+  const [name, setName] = useState(profile.display_name ?? '')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const clean = name.trim()
+
+  async function save(ev) {
+    ev.preventDefault()
+    if (saving) return
+    if (!clean) return setError('Hãy nhập tên hiển thị.')
+    setSaving(true)
+    setError('')
+    try {
+      mustChange(await supabase.from('profiles').update({ display_name: clean }).eq('id', profile.id).select('id'))
+      reloadProfile()
+      toast.push({ message: `Đã đổi tên hiển thị thành ${clean}.` })
+    } catch (e) {
+      setError(friendlyError(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <>
+      <h3 className="kk-sub kk-sub-first">Tên hiển thị</h3>
+      <form className="kk-name-form" onSubmit={save} noValidate>
+        <Field label="Tên mọi người nhìn thấy trong lịch sử" htmlFor="acc-name" error={error}>
+          <input
+            id="acc-name"
+            value={name}
+            maxLength={60}
+            autoComplete="name"
+            aria-invalid={error ? true : undefined}
+            onChange={(e) => {
+              setName(e.target.value)
+              setError('')
+            }}
+          />
+        </Field>
+        <button type="submit" className="kk-btn kk-btn-outline" disabled={saving || clean === (profile.display_name ?? '')}>
+          {saving && <Loader2 size={18} className="kk-spin" />}
+          Lưu tên
+        </button>
+      </form>
+    </>
+  )
+}
 
 /** Mục "Tài khoản" của trang Cài đặt: đổi mật khẩu khi đang đăng nhập */
 export default function SettingsAccount() {
-  const { email } = useShell()
+  const { email, profile } = useShell()
   const toast = useToast()
   const [current, setCurrent] = useState('')
   const [showCurrent, setShowCurrent] = useState(false)
@@ -75,11 +130,15 @@ export default function SettingsAccount() {
       <div className="kk-card-head">
         <div>
           <h2 id="set-account">Tài khoản</h2>
-          <p className="kk-card-sub">Đang đăng nhập bằng {email}</p>
+          <p className="kk-card-sub">
+            Đang đăng nhập bằng {email}, vai trò {roleLabel(profile.role)}
+          </p>
         </div>
       </div>
 
-      <h3 className="kk-sub kk-sub-first">Đổi mật khẩu</h3>
+      {!profile.legacy && <DisplayName />}
+
+      <h3 className={`kk-sub ${profile.legacy ? 'kk-sub-first' : ''}`}>Đổi mật khẩu</h3>
       <form className="kk-account-form" onSubmit={submit} noValidate>
         <PasswordInput
           key={`current-${round}`}
