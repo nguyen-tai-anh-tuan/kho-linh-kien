@@ -233,6 +233,11 @@ export default function Overview() {
         <div className="kk-card">
           <div className="kk-card-head">
             <h2>Hoạt động gần đây</h2>
+            {activity && activity.length > 0 && (
+              <Link className="kk-link" to="/history">
+                Xem toàn bộ lịch sử
+              </Link>
+            )}
           </div>
           {activity === null && !extraError ? (
             <div className="kk-skel-list">

@@ -16,7 +16,29 @@ export function useTx() {
   return ctx
 }
 
-/** Mở cửa sổ nhập/xuất từ bất kỳ đâu: openTx({ type, componentId, componentIds }) */
+/** Hoàn tác = ghi giao dịch ngược lại, lịch sử cũ vẫn được giữ nguyên */
+export function useUndoTx() {
+  const { reload } = useData()
+  const toast = useToast()
+  return useCallback(
+    async (done) => {
+      const inverse = [...done].reverse().map((r) => ({
+        component_id: r.component_id,
+        location_id: r.location_id,
+        type: r.type === 'in' ? 'out' : r.type === 'out' ? 'in' : 'adjust',
+        quantity: r.type === 'adjust' ? r.quantity - r.delta : r.quantity,
+        note: 'Hoàn tác giao dịch trước',
+      }))
+      const { error: err } = await supabase.from('transactions').insert(inverse)
+      if (err) return toast.push({ tone: 'error', message: `Không hoàn tác được. ${friendlyError(err)}`, duration: 9000 })
+      await reload()
+      toast.push({ message: 'Đã hoàn tác giao dịch.' })
+    },
+    [reload, toast],
+  )
+}
+
+/** Mở cửa sổ nhập/xuất từ bất kỳ đâu: openTx({ type, componentId, componentIds, locationId }) */
 export function TxProvider({ children }) {
   const [opts, setOpts] = useState(null)
   const openTx = useCallback((o = {}) => setOpts({ ...o, key: Date.now() }), [])
@@ -38,17 +60,21 @@ const TYPES = {
 let lineSeq = 0
 const newLine = (componentId = null) => ({ id: ++lineSeq, componentId, locationId: null, qty: '' })
 
-function TxModal({ type: initialType = 'in', componentId, componentIds, onClose }) {
+function TxModal({ type: initialType = 'in', componentId, componentIds, locationId: presetLocationId, onClose }) {
   const { componentsById, locations, projects, stockMap, stockByComponent, createLocation, createProject, reload } =
     useData()
   const toast = useToast()
+  const undo = useUndoTx()
+
+  // Vị trí chọn sẵn (mở từ trang Vị trí) chỉ dùng cho nhập và điều chỉnh; xuất thì phải lấy từ nơi đang có hàng
+  const presetFor = (t) => (t !== 'out' && presetLocationId ? presetLocationId : null)
 
   const [type, setType] = useState(initialType)
   const [lines, setLines] = useState(() => {
     const ids = componentIds?.length ? componentIds : componentId ? [componentId] : [null]
     return ids.map((id) => {
       const l = newLine(id)
-      if (id) l.locationId = pickLocation(initialType, id, [], locations, stockByComponent)
+      if (id) l.locationId = presetFor(initialType) ?? pickLocation(initialType, id, [], locations, stockByComponent)
       return l
     })
   })
@@ -109,7 +135,7 @@ function TxModal({ type: initialType = 'in', componentId, componentIds, onClose 
     const others = lines.filter((l) => l.id !== line.id)
     patchLine(line.id, {
       componentId: id,
-      locationId: id ? pickLocation(type, id, others, locations, stockByComponent) : null,
+      locationId: id ? (presetFor(type) ?? pickLocation(type, id, others, locations, stockByComponent)) : null,
     })
   }
 
@@ -173,21 +199,6 @@ function TxModal({ type: initialType = 'in', componentId, componentIds, onClose 
       action: { label: 'Hoàn tác', onClick: () => undo(data) },
     })
     onClose()
-  }
-
-  async function undo(done) {
-    // Hoàn tác = ghi giao dịch ngược lại, lịch sử cũ vẫn được giữ nguyên
-    const inverse = [...done].reverse().map((r) => ({
-      component_id: r.component_id,
-      location_id: r.location_id,
-      type: r.type === 'in' ? 'out' : r.type === 'out' ? 'in' : 'adjust',
-      quantity: r.type === 'adjust' ? r.quantity - r.delta : r.quantity,
-      note: 'Hoàn tác giao dịch trước',
-    }))
-    const { error: err } = await supabase.from('transactions').insert(inverse)
-    if (err) return toast.push({ tone: 'error', message: `Không hoàn tác được. ${friendlyError(err)}`, duration: 9000 })
-    await reload()
-    toast.push({ message: 'Đã hoàn tác giao dịch.' })
   }
 
   const T = TYPES[type]

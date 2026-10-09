@@ -10,11 +10,27 @@ export async function fetchAll(buildQuery, pageSize = 1000) {
   return out
 }
 
+/** Supabase không báo lỗi khi sửa/xóa bị chặn quyền (chỉ trả về 0 dòng), nên phải tự kiểm tra. */
+export function mustChange({ data, error }) {
+  if (error) throw error
+  if (!data || data.length === 0) throw new Error('NO_ROWS_CHANGED')
+  return data
+}
+
+/** Bảng hoặc hàm chưa có trong database (chưa chạy file SQL nâng cấp) */
+export function isMissingSchema(error) {
+  return ['PGRST205', 'PGRST202', '42P01'].includes(String(error?.code ?? ''))
+}
+
 /** Đổi lỗi kỹ thuật thành câu tiếng Việt dễ hiểu, nói rõ cách xử lý. */
 export function friendlyError(error) {
   const msg = String(error?.message ?? error ?? '')
   const code = String(error?.code ?? '')
   const low = msg.toLowerCase()
+
+  if (msg.includes('NO_ROWS_CHANGED')) {
+    return 'Chưa có gì được thay đổi. Mục này có thể đã bị xóa, hoặc tài khoản chưa được cấp quyền sửa/xóa trong Supabase.'
+  }
 
   if (msg.includes('INSUFFICIENT_STOCK')) {
     const detail = error?.details ? ` (${error.details})` : ''
@@ -39,7 +55,8 @@ export function friendlyError(error) {
     low.includes('could not find the') ||
     low.includes('does not exist')
   ) {
-    return 'Database chưa được nâng cấp. Hãy chạy file sql/02_dashboard.sql trong Supabase (SQL Editor) rồi tải lại trang.'
+    const file = low.includes('project_bom') ? 'sql/03_pages.sql' : 'sql/02_dashboard.sql'
+    return `Database chưa được nâng cấp. Hãy chạy file ${file} trong Supabase (SQL Editor) rồi tải lại trang.`
   }
   if (low.includes('jwt') || low.includes('not authenticated')) {
     return 'Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.'

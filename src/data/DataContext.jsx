@@ -48,7 +48,7 @@ export function DataProvider({ children }) {
           .select('id,name,parent_id,path,depth,qr_code')
           .order('path')
           .then(must),
-        supabase.from('projects').select('id,name').order('name').then(must),
+        supabase.from('projects').select('id,name,description').order('name').then(must),
       ])
       if (!alive.current) return
       setRaw({ components, stock, categories, locations, projects })

@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   LogOut,
   MapPin,
+  Menu,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
@@ -26,6 +27,11 @@ import { TxProvider, useTx } from './TxContext'
 import { ShellContext } from './ShellContext'
 import Overview from './pages/Overview'
 import ComponentsPage from './pages/Components'
+import LocationsPage from './pages/Locations'
+import ProjectsPage from './pages/Projects'
+import HistoryPage from './pages/History'
+import SettingsPage from './pages/Settings'
+import { Modal } from './ui/Modal'
 import ComponentDrawer from './ComponentDrawer'
 import ComponentForm from './ComponentForm'
 import ImportCsvModal from './ImportCsvModal'
@@ -42,12 +48,15 @@ function readCollapsed() {
   }
 }
 
-const SOON = [
-  { label: 'Vị trí', Icon: MapPin },
-  { label: 'Dự án và BOM', Icon: FolderKanban },
-  { label: 'Lịch sử', Icon: History },
-  { label: 'Cài đặt', Icon: Settings },
+const MORE_PAGES = [
+  { to: '/locations', label: 'Vị trí', Icon: MapPin },
+  { to: '/projects', label: 'Dự án và BOM', Icon: FolderKanban },
+  { to: '/history', label: 'Lịch sử', Icon: History },
+  { to: '/settings', label: 'Cài đặt', Icon: Settings },
 ]
+// Trên điện thoại thanh tab chỉ đủ chỗ cho một trang nữa, các trang còn lại nằm trong mục "Khác"
+const TAB_PAGE = MORE_PAGES[0]
+const SHEET_PAGES = MORE_PAGES.slice(1)
 
 export default function Dashboard({ session }) {
   return (
@@ -66,6 +75,7 @@ function Shell({ session }) {
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [form, setForm] = useState(null) // { component: dòng linh kiện | null }
   const [importing, setImporting] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [params, setParams] = useSearchParams()
   const location = useLocation()
   const navigate = useNavigate()
@@ -74,6 +84,7 @@ function Shell({ session }) {
 
   const openId = params.get('c')
   const onComponents = location.pathname.startsWith('/components')
+  const onSheetPage = SHEET_PAGES.some((p) => location.pathname.startsWith(p.to))
   const q = params.get('q') ?? ''
   const attention = useMemo(() => components.filter((c) => c.status !== 'ok').length, [components])
   const email = session?.user?.email ?? ''
@@ -190,12 +201,11 @@ function Shell({ session }) {
             </button>
 
             <div className="kk-nav-sep" />
-            {SOON.map(({ label, Icon }) => (
-              <span key={label} className="kk-nav-soon" aria-disabled="true" title={`${label}: sắp có`}>
+            {MORE_PAGES.map(({ to, label, Icon }) => (
+              <NavLink key={to} to={to} title={label}>
                 <Icon size={20} />
                 <span className="kk-side-text">{label}</span>
-                <em className="kk-side-text">Sắp có</em>
-              </span>
+              </NavLink>
             ))}
           </nav>
 
@@ -276,6 +286,10 @@ function Shell({ session }) {
             <Routes>
               <Route path="/" element={<Overview />} />
               <Route path="/components" element={<ComponentsPage />} />
+              <Route path="/locations" element={<LocationsPage />} />
+              <Route path="/projects" element={<ProjectsPage />} />
+              <Route path="/history" element={<HistoryPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </main>
@@ -294,16 +308,38 @@ function Shell({ session }) {
           <button type="button" className="kk-fab" onClick={() => openTx({ type: 'in' })} aria-label="Nhập / xuất kho">
             <Plus size={28} />
           </button>
-          <button type="button" onClick={toggleTheme}>
-            {theme === 'light' ? <Moon size={22} /> : <Sun size={22} />}
-            <span>Giao diện</span>
-          </button>
-          <button type="button" onClick={() => supabase.auth.signOut()}>
-            <LogOut size={22} />
-            <span>Đăng xuất</span>
+          <NavLink to={TAB_PAGE.to}>
+            <TAB_PAGE.Icon size={22} />
+            <span>{TAB_PAGE.label}</span>
+          </NavLink>
+          <button type="button" className={onSheetPage ? 'active' : ''} aria-haspopup="dialog" onClick={() => setMenuOpen(true)}>
+            <Menu size={22} />
+            <span>Khác</span>
           </button>
         </nav>
       </div>
+
+      {menuOpen && (
+        <Modal title="Mục khác" subtitle={email} onClose={() => setMenuOpen(false)}>
+          <nav className="kk-menu" aria-label="Các trang khác">
+            {SHEET_PAGES.map(({ to, label, Icon }) => (
+              <NavLink key={to} to={to} onClick={() => setMenuOpen(false)}>
+                <Icon size={20} />
+                {label}
+              </NavLink>
+            ))}
+            <div className="kk-menu-sep" />
+            <button type="button" onClick={toggleTheme}>
+              {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+              {theme === 'light' ? 'Chuyển sang giao diện tối' : 'Chuyển sang giao diện sáng'}
+            </button>
+            <button type="button" onClick={() => supabase.auth.signOut()}>
+              <LogOut size={20} />
+              Đăng xuất
+            </button>
+          </nav>
+        </Modal>
+      )}
 
       {openId && <ComponentDrawer key={openId} id={openId} onClose={closeComponent} />}
       {form && (

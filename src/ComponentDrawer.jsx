@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -257,6 +258,11 @@ export default function ComponentDrawer({ id, onClose }) {
               </li>
             ))}
           </ul>
+        )}
+        {Array.isArray(history) && history.length > 0 && (
+          <Link className="kk-link kk-history-more" to={`/history?comp=${id}`}>
+            Xem toàn bộ lịch sử của linh kiện này
+          </Link>
         )}
       </div>
     </Modal>

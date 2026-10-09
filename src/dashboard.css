@@ -2012,3 +2012,469 @@
     opacity: 0.5;
   }
 }
+
+/* =====================================================================
+   Các trang Vị trí, Lịch sử, Dự án và BOM, Cài đặt
+   ===================================================================== */
+.kk-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.kk-nowrap {
+  white-space: nowrap;
+}
+.kk-strong-num {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.kk-num-up {
+  color: var(--ok);
+}
+.kk-num-down {
+  color: var(--kk-warn);
+}
+.kk-num-note {
+  font-weight: 500;
+  color: var(--muted);
+}
+.kk-cell-note {
+  max-width: 260px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.kk-confirm-text {
+  margin: 0;
+  line-height: 1.6;
+}
+.kk-table-static tbody tr {
+  cursor: default;
+}
+.kk-table-static tbody tr:hover {
+  background: none;
+}
+.kk-col-act {
+  width: 54px;
+  text-align: right;
+}
+.kk-history-more {
+  margin-top: 10px;
+}
+.kk-table-card.is-stale {
+  opacity: 0.6;
+}
+/* Thẻ có ô gợi ý thả xuống bên trong thì không được cắt phần tràn */
+.kk-card-open {
+  overflow: visible;
+}
+
+/* Nhãn loại giao dịch */
+.kk-type-in {
+  background: color-mix(in srgb, var(--series-1) 16%, var(--card));
+}
+.kk-type-in svg {
+  color: var(--series-1);
+}
+.kk-type-out {
+  background: color-mix(in srgb, var(--series-2) 16%, var(--card));
+}
+.kk-type-out svg {
+  color: var(--series-2);
+}
+.kk-type-adjust {
+  background: var(--kk-soft);
+}
+.kk-type-adjust svg {
+  color: var(--muted);
+}
+
+/* Bố cục hai cột: danh sách bên trái, chi tiết bên phải */
+.kk-split {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.kk-tree-card {
+  position: sticky;
+  top: 86px;
+  max-height: calc(100dvh - 110px);
+  padding: 10px;
+  overflow: auto;
+}
+.kk-tree,
+.kk-pick-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kk-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: calc(var(--depth, 0) * 18px);
+  border-radius: 12px;
+}
+.kk-tree-row.is-on,
+.kk-pick.is-on {
+  background: color-mix(in srgb, var(--primary) 13%, var(--card));
+}
+.kk-tree-toggle {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+}
+button.kk-tree-toggle:hover {
+  background: var(--kk-hover);
+  color: var(--text);
+}
+.kk-tree-item {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 40px;
+  padding: 0 10px 0 4px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-align: left;
+}
+.kk-tree-row:not(.is-on) .kk-tree-item:hover,
+.kk-pick:not(.is-on):hover {
+  background: var(--kk-hover);
+}
+.kk-tree-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kk-tree-count {
+  flex: none;
+  min-width: 24px;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.kk-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  text-align: left;
+}
+.kk-pick strong {
+  font-size: 0.93rem;
+  overflow-wrap: anywhere;
+}
+.kk-pick small {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.kk-pick small.kk-warn-text {
+  color: var(--kk-warn);
+}
+
+/* Đầu khung chi tiết */
+.kk-pane-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 14px;
+}
+.kk-pane-titles {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.kk-pane-titles h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.kk-pane-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.kk-pane-actions .kk-icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+}
+.kk-pane-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+}
+
+/* Dải thông báo đủ / thiếu */
+.kk-banner {
+  display: flex;
+  flex: 1 1 260px;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.kk-banner > svg {
+  flex: none;
+  margin-top: 1px;
+}
+.kk-banner-ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.kk-banner-warn {
+  background: var(--kk-warn-bg);
+  color: var(--kk-warn);
+}
+.kk-banner-block ul {
+  margin: 6px 0;
+  padding-left: 18px;
+}
+
+/* BOM */
+.kk-bom-builds {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.kk-bom-builds .kk-stepper,
+.kk-cell-stepper {
+  width: 132px;
+}
+.kk-bom-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px auto;
+  gap: 12px;
+  align-items: end;
+  padding: 16px 20px 20px;
+  border-top: 1px solid var(--border);
+}
+.kk-bom-add-error {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+/* Bộ lọc có nhãn (trang Lịch sử) */
+.kk-filters {
+  align-items: flex-end;
+}
+.kk-filter {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+.kk-filter-wide {
+  flex: 2 1 240px;
+}
+.kk-filter > label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.kk-filters .kk-filter select {
+  width: 100% !important;
+  max-width: none;
+}
+.kk-filter-clear {
+  height: 42px;
+}
+
+/* Cài đặt */
+.kk-settings {
+  display: grid;
+  gap: 16px;
+}
+.kk-settings .kk-page-head {
+  margin-bottom: 6px;
+}
+.kk-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kk-rows li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+.kk-rows li:last-child {
+  border-bottom: 0;
+}
+.kk-rows-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.kk-rows-meta {
+  font-size: 0.82rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+/* Dòng không có nút: chừa chỗ bằng hai nút để cột số lượng thẳng hàng */
+.kk-rows li.kk-rows-plain {
+  padding-right: 96px;
+}
+.kk-rows-plain .kk-rows-name {
+  font-weight: 500;
+  color: var(--muted);
+}
+.kk-sub-first {
+  margin-top: 0;
+}
+.kk-bulk-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 16px;
+}
+.kk-bulk-form .kk-field {
+  flex: 0 1 220px;
+}
+.kk-bulk-form .kk-switch {
+  height: 42px;
+}
+.kk-bulk-note {
+  margin-top: 10px;
+}
+.kk-toolbar-flat {
+  margin-bottom: 12px;
+  padding: 0;
+}
+.kk-min-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.kk-min-input input {
+  width: 96px !important;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Bảng "Khác" trên điện thoại */
+.kk-menu {
+  display: grid;
+  gap: 4px;
+}
+.kk-menu :is(a, button) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 48px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: none;
+}
+.kk-menu :is(a, button):hover {
+  background: var(--kk-hover);
+}
+.kk-menu a.active {
+  background: var(--kk-soft);
+  color: var(--kk-link);
+}
+.kk-menu-sep {
+  height: 1px;
+  margin: 6px 4px;
+  background: var(--border);
+}
+
+@media (max-width: 1040px) {
+  .kk-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .kk-tree-card {
+    position: static;
+    max-height: 320px;
+  }
+}
+@media (max-width: 860px) {
+  .kk-tabbar button.active {
+    color: var(--kk-link);
+  }
+  .kk-tree-toggle {
+    width: 40px;
+    height: 44px;
+  }
+  .kk-tree-item,
+  .kk-pick {
+    min-height: 44px;
+  }
+}
+@media (max-width: 720px) {
+  .kk-table-plain tr {
+    padding-left: 14px;
+  }
+  .kk-cell-note {
+    max-width: none;
+  }
+  .kk-col-act {
+    width: auto;
+  }
+  .kk-pane-head {
+    padding: 16px 14px 12px;
+  }
+  .kk-pane-bar {
+    padding: 12px 14px;
+  }
+  .kk-bom-add {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 14px;
+  }
+  .kk-bulk-form .kk-field {
+    flex: 1 1 100%;
+  }
+}
