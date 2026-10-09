@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   ArrowLeftRight,
   Boxes,
   Cpu,
   FolderKanban,
   History,
+  KeyRound,
   LayoutDashboard,
   LogOut,
   MapPin,
@@ -117,8 +118,9 @@ function Shell({ session }) {
       closeComponent,
       openForm: (component) => setForm({ component: component ?? null }),
       openImport: () => setImporting(true),
+      email,
     }),
-    [openComponent, closeComponent],
+    [openComponent, closeComponent, email],
   )
 
   function toggleCollapsed() {
@@ -328,6 +330,10 @@ function Shell({ session }) {
                 {label}
               </NavLink>
             ))}
+            <Link to="/settings#account" onClick={() => setMenuOpen(false)}>
+              <KeyRound size={20} />
+              Đổi mật khẩu
+            </Link>
             <div className="kk-menu-sep" />
             <button type="button" onClick={toggleTheme}>
               {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}

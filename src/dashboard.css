@@ -2386,6 +2386,20 @@ button.kk-tree-toggle:hover {
   margin-bottom: 12px;
   padding: 0;
 }
+.kk-account-form {
+  display: grid;
+  gap: 2px;
+  max-width: 420px;
+}
+.kk-account-form .kk-switch {
+  margin: 4px 0 14px;
+}
+.kk-account-form .kk-form-error {
+  margin: 0 0 14px;
+}
+#account {
+  scroll-margin-top: 90px;
+}
 .kk-min-input {
   display: inline-flex;
   align-items: center;

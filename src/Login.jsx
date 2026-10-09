@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2, ArrowLeft } from 'lucide-react'
 import { supabase } from './supabaseClient'
 import AuthLayout from './AuthLayout'
+import { markResetSent, resetCooldownLeft, translateAuthError } from './lib/auth'
 
 const EMAIL_KEY = 'kho_last_email'
 
@@ -15,26 +16,28 @@ function saveEmail(value) {
   } catch { /* bỏ qua */ }
 }
 
-function translateError(message = '') {
-  const m = message.toLowerCase()
-  if (m.includes('invalid login credentials')) return 'Sai email hoặc mật khẩu. Bạn kiểm tra lại nhé.'
-  if (m.includes('email not confirmed')) return 'Tài khoản này chưa được xác nhận email.'
-  if (m.includes('rate limit') || m.includes('too many')) return 'Bạn thử quá nhiều lần, vui lòng đợi một lúc rồi thử lại.'
-  if (m.includes('failed to fetch') || m.includes('network')) return 'Không kết nối được máy chủ. Hãy kiểm tra mạng của bạn.'
-  return `Có lỗi xảy ra: ${message}`
-}
+const LINK_EXPIRED = 'Link đặt lại mật khẩu đã hết hạn hoặc đã được dùng rồi. Nhập email để nhận link mới nhé.'
 
-export default function Login() {
-  const [mode, setMode] = useState('login') // 'login' | 'forgot'
+/** linkExpired: người dùng vừa bấm một link đặt lại mật khẩu không còn dùng được */
+export default function Login({ linkExpired = false }) {
+  const [mode, setMode] = useState(linkExpired ? 'forgot' : 'login') // 'login' | 'forgot'
   const [email, setEmail] = useState(getSavedEmail)
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(true)
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(linkExpired ? LINK_EXPIRED : '')
   const [info, setInfo] = useState('')
+  const [wait, setWait] = useState(resetCooldownLeft) // số giây còn phải đợi trước khi gửi lại email
   const emailRef = useRef(null)
   const passRef = useRef(null)
+
+  const waiting = wait > 0
+  useEffect(() => {
+    if (!waiting) return
+    const timer = setInterval(() => setWait(resetCooldownLeft()), 500)
+    return () => clearInterval(timer)
+  }, [waiting])
 
   // Tự đặt con trỏ: nếu đã nhớ email thì nhảy thẳng vào ô mật khẩu
   useEffect(() => {
@@ -59,7 +62,7 @@ export default function Login() {
       password,
     })
     if (error) {
-      setError(translateError(error.message))
+      setError(translateAuthError(error))
       setLoading(false)
       return
     }
@@ -69,7 +72,7 @@ export default function Login() {
 
   async function handleForgot(e) {
     e.preventDefault()
-    if (loading) return
+    if (loading || waiting) return
     setLoading(true)
     setError('')
     setInfo('')
@@ -77,8 +80,10 @@ export default function Login() {
       redirectTo: window.location.origin,
     })
     setLoading(false)
-    if (error) return setError(translateError(error.message))
-    setInfo('Đã gửi! Hãy kiểm tra hộp thư (cả mục Spam) để lấy link đặt lại mật khẩu.')
+    if (error) return setError(translateAuthError(error))
+    markResetSent()
+    setWait(resetCooldownLeft())
+    setInfo('Đã gửi! Hãy kiểm tra hộp thư (cả mục Spam) để lấy link đặt lại mật khẩu. Link chỉ dùng được một lần.')
   }
 
   const emailField = (
@@ -123,8 +128,16 @@ export default function Login() {
         <form onSubmit={handleForgot}>
           {emailField}
           {messages}
-          <button className="btn-primary" disabled={loading}>
-            {loading ? <><Loader2 size={18} className="spin" /> Đang gửi...</> : 'Gửi link đặt lại'}
+          <button className="btn-primary" disabled={loading || waiting}>
+            {loading ? (
+              <><Loader2 size={18} className="spin" /> Đang gửi...</>
+            ) : waiting ? (
+              `Gửi lại sau ${wait} giây`
+            ) : info ? (
+              'Gửi lại link'
+            ) : (
+              'Gửi link đặt lại'
+            )}
           </button>
         </form>
         <div className="back-row">

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { BellRing, Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
@@ -8,6 +9,7 @@ import { ConfirmDialog, NameDialog } from '../ui/dialogs'
 import { EmptyState, Field, QtyStepper, Skeleton, StatusChip } from '../ui/common'
 import { friendlyError, mustChange } from '../lib/api'
 import { fmtNum, normalize } from '../lib/format'
+import SettingsAccount from './SettingsAccount'
 
 const MAX_ROWS = 50
 
@@ -25,6 +27,12 @@ export default function SettingsPage() {
   // Bảng sửa mức cảnh báo từng món
   const [q, setQ] = useState('')
   const [unsetOnly, setUnsetOnly] = useState(false)
+
+  // Mở từ "Khác › Đổi mật khẩu" (/settings#account): cuộn thẳng tới mục Tài khoản
+  const { hash } = useLocation()
+  useEffect(() => {
+    if (hash === '#account' && !loading) document.getElementById('account')?.scrollIntoView({ block: 'start' })
+  }, [hash, loading])
 
   const countByCategory = useMemo(() => {
     const map = new Map()
@@ -293,6 +301,8 @@ export default function SettingsPage() {
           </>
         )}
       </section>
+
+      <SettingsAccount />
 
       {dialog?.kind === 'add' && (
         <NameDialog
