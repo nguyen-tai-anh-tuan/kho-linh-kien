@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, ChevronDown, ChevronRight, CornerDownRight, FolderPlus, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { AlertTriangle, CornerDownRight, FolderPlus, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
 import { useShell } from '../ShellContext'
@@ -7,6 +7,7 @@ import { useToast } from '../ui/Toast'
 import { Modal } from '../ui/Modal'
 import { ConfirmDialog, NameDialog } from '../ui/dialogs'
 import { Field, Skeleton } from '../ui/common'
+import { CategoryMega } from '../ui/CategoryMenu'
 import { friendlyError, mustChange } from '../lib/api'
 import { indentLabel, subtreeIds } from '../lib/tree'
 import { fmtNum, normalize } from '../lib/format'
@@ -18,10 +19,10 @@ const levelName = (depth) => LEVELS[Math.min(depth, MAX_DEPTH)]
 
 /** Mục "Danh mục linh kiện" của trang Cài đặt: cây ba tầng, admin thêm / đổi tên / chuyển / xóa */
 export default function SettingsCategories() {
-  const { components, categories, categoryChildren, toneByCategory, categoryTree, loading, reload, createCategory } = useData()
+  const { components, categories, categoryChildren, categoryTree, loading, reload, createCategory } = useData()
   const { isAdmin, canEdit } = useShell()
   const toast = useToast()
-  const [open, setOpen] = useState(() => new Set()) // các danh mục đang mở ra
+  const [activeRoot, setActiveRoot] = useState(null) // danh mục lớn đang xem ở cột trái
   const [dialog, setDialog] = useState(null) // { kind: 'add' | 'rename' | 'move' | 'delete', category }
 
   // Số linh kiện gắn trực tiếp vào từng danh mục, và tính cả các danh mục bên trong
@@ -38,14 +39,6 @@ export default function SettingsCategories() {
     return { direct, total, uncategorized }
   }, [components, categories, categoryChildren])
 
-  const visible = categories.filter((c) => {
-    // Hiện khi mọi danh mục phía trên nó đều đang mở
-    for (let p = c.parent_id; p; p = categories.find((x) => x.id === p)?.parent_id) {
-      if (!open.has(p)) return false
-    }
-    return true
-  })
-
   const kidsOf = (id) => categoryChildren.get(id) ?? []
   // Số tầng nằm bên dưới một danh mục (0 = không có danh mục con)
   const heightOf = (id) => (kidsOf(id).length === 0 ? 0 : kidsOf(id).some((k) => kidsOf(k.id).length > 0) ? 2 : 1)
@@ -54,18 +47,9 @@ export default function SettingsCategories() {
       .filter((c) => c.id !== exceptId)
       .map((c) => normalize(c.name))
 
-  function toggle(id) {
-    setOpen((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }
-
   async function add(name, parent) {
-    await createCategory(name, parent?.id ?? null)
-    if (parent) setOpen((prev) => new Set(prev).add(parent.id))
+    const row = await createCategory(name, parent?.id ?? null)
+    setActiveRoot(parent ? parent.root_id : row.id)
     toast.push({ message: `Đã thêm ${levelName(parent ? parent.depth + 1 : 0)} ${name}.` })
   }
 
@@ -81,7 +65,7 @@ export default function SettingsCategories() {
       await supabase.from('categories').update({ parent_id: parentId, sort_order: order }).eq('id', category.id).select('id'),
     )
     await reload()
-    if (parentId) setOpen((prev) => new Set([...prev, ...parentChain(parentId)]))
+    setActiveRoot(parentId ? categories.find((c) => c.id === parentId)?.root_id : category.id)
     toast.push({ message: `Đã chuyển ${category.name}.` })
   }
 
@@ -92,15 +76,59 @@ export default function SettingsCategories() {
     toast.push({ message: `Đã xóa ${levelName(category.depth)} ${category.name}.` })
   }
 
-  // Một danh mục và mọi danh mục phía trên nó
-  function parentChain(id) {
-    const out = []
-    for (let p = id; p; p = categories.find((x) => x.id === p)?.parent_id) out.push(p)
-    return out
+  // Các nút cạnh một danh mục: thành viên được thêm, còn đổi tên / chuyển / xóa là của admin
+  const actions = (c) => {
+    const kids = kidsOf(c.id)
+    return (
+      <span className="kk-cat-actions">
+        {categoryTree && c.depth < MAX_DEPTH && (
+          <button
+            type="button"
+            className="kk-icon-btn"
+            aria-label={`Thêm ${levelName(c.depth + 1)} vào ${c.name}`}
+            title={`Thêm ${levelName(c.depth + 1)}`}
+            onClick={() => setDialog({ kind: 'add', category: c })}
+          >
+            <FolderPlus size={16} />
+          </button>
+        )}
+        {isAdmin && (
+          <button
+            type="button"
+            className="kk-icon-btn"
+            aria-label={`Đổi tên ${c.name}`}
+            title="Đổi tên"
+            onClick={() => setDialog({ kind: 'rename', category: c })}
+          >
+            <Pencil size={16} />
+          </button>
+        )}
+        {isAdmin && categoryTree && (
+          <>
+            <button
+              type="button"
+              className="kk-icon-btn"
+              aria-label={`Chuyển ${c.name} sang danh mục khác`}
+              title="Chuyển vào danh mục khác"
+              onClick={() => setDialog({ kind: 'move', category: c })}
+            >
+              <CornerDownRight size={16} />
+            </button>
+            <button
+              type="button"
+              className="kk-icon-btn"
+              aria-label={`Xóa ${c.name}`}
+              title={kids.length > 0 ? 'Hãy xóa hoặc chuyển các danh mục bên trong trước' : 'Xóa danh mục'}
+              disabled={kids.length > 0}
+              onClick={() => setDialog({ kind: 'delete', category: c })}
+            >
+              <Trash2 size={16} />
+            </button>
+          </>
+        )}
+      </span>
+    )
   }
-
-  const hasNested = categories.some((c) => c.depth > 0)
-  const allOpen = hasNested && categories.every((c) => kidsOf(c.id).length === 0 || open.has(c.id))
 
   return (
     <section className="kk-card" aria-labelledby="set-cat">
@@ -141,104 +169,17 @@ export default function SettingsCategories() {
         </p>
       ) : (
         <>
-          {hasNested && (
-            <div className="kk-cat-tools">
-              <button
-                type="button"
-                className="kk-link"
-                onClick={() => setOpen(allOpen ? new Set() : new Set(categories.filter((c) => kidsOf(c.id).length > 0).map((c) => c.id)))}
-              >
-                {allOpen ? 'Thu gọn tất cả' : 'Mở tất cả'}
-              </button>
-            </div>
-          )}
-          <ul className="kk-rows kk-cat-tree">
-            {visible.map((c) => {
-              const kids = kidsOf(c.id)
-              const isOpen = open.has(c.id)
-              const count = total.get(c.id) ?? 0
-              return (
-                <li key={c.id} style={{ '--depth': c.depth }}>
-                  {kids.length > 0 ? (
-                    <button
-                      type="button"
-                      className="kk-tree-toggle"
-                      aria-expanded={isOpen}
-                      aria-label={`${isOpen ? 'Thu gọn' : 'Mở'} ${c.name}`}
-                      onClick={() => toggle(c.id)}
-                    >
-                      {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    </button>
-                  ) : (
-                    <span className="kk-tree-toggle" aria-hidden="true" />
-                  )}
-                  <i className={`kk-dot kk-tone-${toneByCategory.get(c.id) ?? 'x'}`} aria-hidden="true" />
-                  <span className={`kk-rows-name ${c.depth > 0 ? 'is-sub' : ''}`}>
-                    {c.name}
-                    {kids.length > 0 && !isOpen && <small>{fmtNum(kids.length)} danh mục bên trong</small>}
-                  </span>
-                  <span className="kk-rows-meta">{fmtNum(count)} linh kiện</span>
-                  {canEdit && (
-                    <span className="kk-cat-actions">
-                      {categoryTree && c.depth < MAX_DEPTH && (
-                        <button
-                          type="button"
-                          className="kk-icon-btn"
-                          aria-label={`Thêm ${levelName(c.depth + 1)} vào ${c.name}`}
-                          title={`Thêm ${levelName(c.depth + 1)}`}
-                          onClick={() => setDialog({ kind: 'add', category: c })}
-                        >
-                          <FolderPlus size={16} />
-                        </button>
-                      )}
-                      {isAdmin && (
-                      <button
-                        type="button"
-                        className="kk-icon-btn"
-                        aria-label={`Đổi tên ${c.name}`}
-                        title="Đổi tên"
-                        onClick={() => setDialog({ kind: 'rename', category: c })}
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      )}
-                      {isAdmin && categoryTree && (
-                        <>
-                          <button
-                            type="button"
-                            className="kk-icon-btn"
-                            aria-label={`Chuyển ${c.name} sang danh mục khác`}
-                            title="Chuyển vào danh mục khác"
-                            onClick={() => setDialog({ kind: 'move', category: c })}
-                          >
-                            <CornerDownRight size={16} />
-                          </button>
-                          <button
-                            type="button"
-                            className="kk-icon-btn"
-                            aria-label={`Xóa ${c.name}`}
-                            title={kids.length > 0 ? 'Hãy xóa hoặc chuyển các danh mục bên trong trước' : 'Xóa danh mục'}
-                            disabled={kids.length > 0}
-                            onClick={() => setDialog({ kind: 'delete', category: c })}
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </>
-                      )}
-                    </span>
-                  )}
-                </li>
-              )
-            })}
-            {uncategorized > 0 && (
-              <li className="kk-rows-muted">
-                <span className="kk-tree-toggle" aria-hidden="true" />
-                <i className="kk-dot kk-tone-x" aria-hidden="true" />
-                <span className="kk-rows-name">Chưa phân loại</span>
-                <span className="kk-rows-meta">{fmtNum(uncategorized)} linh kiện</span>
-              </li>
-            )}
-          </ul>
+          <CategoryMega
+            page
+            activeRoot={activeRoot}
+            onActiveRoot={setActiveRoot}
+            count={(c) => <span title={`${fmtNum(total.get(c.id) ?? 0)} linh kiện`}>{fmtNum(total.get(c.id) ?? 0)}</span>}
+            actions={canEdit ? actions : undefined}
+          />
+          <p className="kk-muted-text kk-cat-note">
+            Con số cạnh mỗi danh mục là số linh kiện bên trong, tính cả các danh mục con.
+            {uncategorized > 0 && ` Còn ${fmtNum(uncategorized)} linh kiện chưa phân loại.`}
+          </p>
         </>
       )}
 

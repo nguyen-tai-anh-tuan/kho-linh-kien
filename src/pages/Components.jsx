@@ -19,7 +19,8 @@ import { useShell } from '../ShellContext'
 import { CategoryChip, EmptyState, Skeleton, StatusChip, StockBar } from '../ui/common'
 import { downloadCSV } from '../lib/csv'
 import { fmtNum, fmtPrice, normalize } from '../lib/format'
-import { indentLabel, subtreeIds } from '../lib/tree'
+import { CategoryFilter } from '../ui/CategoryMenu'
+import { subtreeIds } from '../lib/tree'
 
 const PAGE_SIZE = 25
 const STATUS_ORDER = { out: 0, low: 1, ok: 2 }
@@ -36,7 +37,6 @@ const COLUMNS = [
 export default function ComponentsPage() {
   const {
     components,
-    categories,
     categoriesById,
     categoryChildren,
     locations,
@@ -236,15 +236,7 @@ export default function ComponentsPage() {
             onChange={(e) => setParam('q', e.target.value)}
           />
         </div>
-        <select aria-label="Lọc theo loại" value={cat} onChange={(e) => setParam('cat', e.target.value)}>
-          <option value="">Mọi loại</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {indentLabel(c)}
-            </option>
-          ))}
-          <option value="none">Chưa phân loại</option>
-        </select>
+        <CategoryFilter value={cat} onChange={(id) => setParam('cat', id)} />
         <select aria-label="Lọc theo package" value={pkg} onChange={(e) => setParam('pkg', e.target.value)}>
           <option value="">Mọi package</option>
           {packages.map((p) => (

@@ -2398,38 +2398,260 @@ button.kk-tree-toggle:hover {
   color: var(--muted);
 }
 
-/* Cây danh mục trong Cài đặt */
-.kk-cat-tree li {
-  flex-wrap: wrap;
-  gap: 6px 8px;
-  padding-left: calc(var(--depth, 0) * 22px);
+/* Menu danh mục hai cột: trái là danh mục lớn, phải là danh mục con và chi tiết */
+.kk-mega {
+  container-type: inline-size;
 }
-.kk-cat-tree .kk-rows-name {
-  flex: 1 1 160px;
+.kk-mega-in {
+  display: grid;
+  grid-template-columns: minmax(210px, 300px) minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
 }
-.kk-cat-banner {
-  margin-bottom: 12px;
+.kk-mega-roots {
+  max-height: 440px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+  background: var(--kk-soft);
 }
-.kk-cat-tree .kk-tree-toggle {
-  height: 38px;
+.kk-mega-roots li + li {
+  border-top: 1px solid var(--border);
 }
-.kk-cat-tree .kk-rows-name small {
-  margin-left: 8px;
-  font-size: 0.76rem;
-  font-weight: 500;
+.kk-mega-root {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
+  padding: 8px 12px 8px 14px;
+  border: 0;
+  background: none;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: left;
+}
+.kk-mega-root:hover {
+  background: var(--kk-hover);
+}
+.kk-mega-root.is-active {
+  background: var(--card);
+  color: var(--kk-link);
+}
+.kk-mega-root:focus-visible {
+  outline-offset: -2px;
+}
+.kk-mega-root .kk-dot {
+  flex: none;
+}
+.kk-mega-root svg {
+  flex: none;
   color: var(--muted);
 }
-.kk-cat-tree .kk-rows-name.is-sub {
+.kk-mega-root-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.kk-mega-num {
+  flex: none;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.kk-mega-panel {
+  min-width: 0;
+  max-height: 440px;
+  padding: 8px 18px 14px;
+  overflow: auto;
+}
+.kk-mega-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 42px;
+  border-bottom: 1px solid var(--border);
+}
+.kk-mega-head .kk-link {
+  text-align: left;
+}
+.kk-mega-panel > .kk-muted-text {
+  margin: 12px 0 0;
+}
+.kk-mega-grid {
+  columns: 2 230px;
+  column-gap: 28px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kk-mega-grid > li {
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+  break-inside: avoid;
+}
+.kk-mega-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+}
+.kk-mega-name {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  margin-left: -8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font-size: 0.9rem;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+button.kk-mega-name:hover {
+  background: var(--kk-hover);
+  color: var(--kk-link);
+}
+.kk-mega-name.is-on,
+.kk-mega-head .kk-link.is-on {
+  color: var(--kk-link);
+  font-weight: 700;
+  text-decoration: underline;
+}
+.kk-mega-sub {
+  margin: 0 0 6px 4px;
+  padding: 0 0 0 14px;
+  list-style: none;
+  border-left: 2px solid var(--border);
+}
+.kk-mega-sub .kk-mega-item {
+  min-height: 34px;
+}
+.kk-mega-sub .kk-mega-name {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+/* Trong trang Cài đặt: không giới hạn chiều cao, cuộn theo trang */
+.kk-mega-page :is(.kk-mega-roots, .kk-mega-panel) {
+  max-height: none;
+}
+@container (max-width: 560px) {
+  .kk-mega-in {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .kk-mega-roots {
+    display: flex;
+    gap: 6px;
+    max-height: none;
+    padding: 8px;
+    overflow-x: auto;
+  }
+  .kk-mega-roots li + li {
+    border-top: 0;
+  }
+  .kk-mega-root {
+    width: auto;
+    min-height: 38px;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--card);
+    white-space: nowrap;
+  }
+  .kk-mega-root.is-active {
+    border-color: var(--primary);
+  }
+  .kk-mega-root svg {
+    display: none;
+  }
+  .kk-mega-panel {
+    padding: 6px 12px 12px;
+  }
+}
+
+/* Nút lọc theo danh mục trên thanh công cụ */
+.kk-toolbar {
+  position: relative;
+}
+.kk-catfilter-btn {
+  max-width: 240px;
+  padding: 0 12px;
   font-weight: 500;
+}
+.kk-catfilter-btn.is-set {
+  border-color: var(--primary);
+  font-weight: 700;
+}
+.kk-catfilter-btn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kk-catfilter-pop {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.45);
+}
+.kk-catfilter-top {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.kk-pill {
+  min-height: 34px;
+  padding: 4px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+.kk-pill:hover {
+  border-color: var(--primary);
+}
+.kk-pill.is-on {
+  border-color: var(--primary);
+  background: var(--kk-soft);
+  color: var(--kk-link);
+}
+/* Ô chọn danh mục trong form: menu hai cột thay cho danh sách */
+.kk-combo-list.kk-combo-mega {
+  max-height: 380px;
+  padding: 6px;
+}
+.kk-combo-mega .kk-mega-in {
+  border: 0;
+}
+.kk-combo-mega :is(.kk-mega-roots, .kk-mega-panel) {
+  max-height: 360px;
+}
+
+/* Danh mục trong Cài đặt */
+.kk-cat-banner {
+  margin-bottom: 12px;
 }
 .kk-cat-actions {
   display: flex;
   flex: none;
 }
-.kk-cat-tools {
-  display: flex;
-  gap: 14px;
-  margin-bottom: 8px;
+.kk-cat-actions .kk-icon-btn {
+  width: 32px;
+  height: 32px;
+}
+.kk-cat-note {
+  margin: 10px 0 0;
+  font-size: 0.82rem;
 }
 
 /* Thành viên */

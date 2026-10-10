@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from 'react'
 import { AlertTriangle, CheckCircle2, XCircle, Minus, Plus, Loader2 } from 'lucide-react'
 import { useData } from '../data/DataContext'
+import { CategoryMega } from './CategoryMenu'
 import { friendlyError } from '../lib/api'
 import { fmtNum, normalize } from '../lib/format'
 
@@ -309,16 +310,23 @@ export function CategoryPicker({ id, value, onChange }) {
   }
 
   return (
-    <div className="kk-combo">
+    <div
+      className="kk-combo"
+      onBlur={(e) => {
+        // Chỉ đóng khi con trỏ rời hẳn khỏi ô chọn (Tab vào menu thì vẫn mở)
+        if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false)
+      }}
+    >
       <input
         id={id}
         role="combobox"
         aria-expanded={open}
         aria-controls={listId}
         aria-autocomplete="list"
-        aria-activedescendant={open && results[hi] !== undefined ? `${listId}-${hi}` : undefined}
+        aria-activedescendant={open && q && results[hi] !== undefined ? `${listId}-${hi}` : undefined}
         autoComplete="off"
-        placeholder="Chưa phân loại. Gõ để tìm danh mục…"
+        autoFocus={open}
+        placeholder="Chưa phân loại. Bấm để chọn hoặc gõ để tìm…"
         value={q}
         onChange={(e) => {
           setQ(e.target.value)
@@ -326,7 +334,7 @@ export function CategoryPicker({ id, value, onChange }) {
           setHi(e.target.value ? 1 : 0)
         }}
         onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
+        onClick={() => setOpen(true)}
         onKeyDown={(e) => {
           if (e.key === 'ArrowDown') {
             e.preventDefault()
@@ -335,7 +343,7 @@ export function CategoryPicker({ id, value, onChange }) {
           } else if (e.key === 'ArrowUp') {
             e.preventDefault()
             setHi((h) => Math.max(h - 1, 0))
-          } else if (e.key === 'Enter' && open && results[hi] !== undefined) {
+          } else if (e.key === 'Enter' && open && q && results[hi] !== undefined) {
             e.preventDefault()
             pick(results[hi])
           } else if (e.key === 'Escape' && open) {
@@ -344,7 +352,13 @@ export function CategoryPicker({ id, value, onChange }) {
           }
         }}
       />
-      {open && (
+      {/* Chưa gõ gì: duyệt theo menu hai cột. Đang gõ: danh sách kết quả tìm. */}
+      {open && !q && categories.length > 0 && (
+        <div className="kk-combo-list kk-combo-mega" id={listId} onMouseDown={(e) => e.preventDefault()}>
+          <CategoryMega onPick={pick} rootLabel={(r) => `Chọn danh mục lớn "${r.name}"`} />
+        </div>
+      )}
+      {open && (q || categories.length === 0) && (
         <ul className="kk-combo-list kk-cat-list" id={listId} role="listbox" tabIndex={-1}>
           {results.map((c, i) => (
             <li
