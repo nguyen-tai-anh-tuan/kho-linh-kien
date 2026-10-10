@@ -354,7 +354,7 @@ export function CategoryPicker({ id, value, onChange }) {
       />
       {/* Chưa gõ gì: duyệt theo menu hai cột. Đang gõ: danh sách kết quả tìm. */}
       {open && !q && categories.length > 0 && (
-        <div className="kk-combo-list kk-combo-mega" id={listId} onMouseDown={(e) => e.preventDefault()}>
+        <div className="kk-combo-mega" id={listId} onMouseDown={(e) => e.preventDefault()}>
           <CategoryMega onPick={pick} rootLabel={(r) => `Chọn danh mục lớn "${r.name}"`} />
         </div>
       )}

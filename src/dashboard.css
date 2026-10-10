@@ -1359,6 +1359,8 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px 16px;
+  /* Bề rộng menu danh mục: trải hết cả hai cột của form */
+  --kk-combo-wide: calc(200% + 16px);
 }
 .kk-span-2 {
   grid-column: 1 / -1;
@@ -1982,6 +1984,9 @@
   .kk-form-grid,
   .kk-dl {
     grid-template-columns: 1fr;
+  }
+  .kk-form-grid {
+    --kk-combo-wide: 100%;
   }
   .kk-txline-grid {
     grid-template-columns: 1fr;
@@ -2626,15 +2631,20 @@ button.kk-mega-name:hover {
   color: var(--kk-link);
 }
 /* Ô chọn danh mục trong form: menu hai cột thay cho danh sách */
-.kk-combo-list.kk-combo-mega {
-  max-height: 380px;
-  padding: 6px;
-}
-.kk-combo-mega .kk-mega-in {
-  border: 0;
+.kk-combo-mega {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 6px);
+  left: 0;
+  /* Trong form hai cột thì trải hết cả hai cột để đủ chỗ cho menu */
+  width: var(--kk-combo-wide, 100%);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.45);
 }
 .kk-combo-mega :is(.kk-mega-roots, .kk-mega-panel) {
-  max-height: 360px;
+  max-height: 320px;
+  scrollbar-width: thin;
 }
 
 /* Danh mục trong Cài đặt */
