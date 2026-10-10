@@ -1,24 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { BellRing, Loader2, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { BellRing, Loader2, Search } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
 import { useShell } from '../ShellContext'
 import { useToast } from '../ui/Toast'
-import { ConfirmDialog, NameDialog } from '../ui/dialogs'
+import { ConfirmDialog } from '../ui/dialogs'
 import { EmptyState, Field, QtyStepper, Skeleton, StatusChip } from '../ui/common'
 import { friendlyError, mustChange } from '../lib/api'
 import { fmtNum, normalize } from '../lib/format'
+import { indentLabel, subtreeIds } from '../lib/tree'
 import SettingsAccount from './SettingsAccount'
+import SettingsCategories from './SettingsCategories'
 import SettingsMembers from './SettingsMembers'
 
 const MAX_ROWS = 50
 
 export default function SettingsPage() {
-  const { components, categories, toneByCategory, searchText, loading, refreshing, error, reload, createCategory } = useData()
-  const { openComponent, isAdmin, profile } = useShell()
+  const { components, categories, categoriesById, categoryChildren, searchText, loading, refreshing, error, reload } = useData()
+  const { openComponent, isAdmin, canEdit, profile } = useShell()
   const toast = useToast()
-  const [dialog, setDialog] = useState(null) // { kind: 'add' | 'rename' | 'delete' | 'bulk', category }
+  const [dialog, setDialog] = useState(null) // { kind: 'bulk' }
 
   // Đặt mức cảnh báo cho cả nhóm
   const [scope, setScope] = useState('')
@@ -35,16 +37,12 @@ export default function SettingsPage() {
     if (hash === '#account' && !loading) document.getElementById('account')?.scrollIntoView({ block: 'start' })
   }, [hash, loading])
 
-  const countByCategory = useMemo(() => {
-    const map = new Map()
-    for (const c of components) map.set(c.category_id ?? 'none', (map.get(c.category_id ?? 'none') ?? 0) + 1)
-    return map
-  }, [components])
-
-  const inScope = (c) => scope === 'all' || (scope === 'none' ? !c.category_id : c.category_id === scope)
+  // Chọn một danh mục thì áp dụng cho cả các danh mục nằm bên trong nó
+  const scopeIds = scope && scope !== 'all' && scope !== 'none' ? subtreeIds(categoryChildren, scope) : []
+  const inScope = (c) => scope === 'all' || (scope === 'none' ? !c.category_id : scopeIds.includes(c.category_id))
   const targets = scope ? components.filter((c) => inScope(c) && (!onlyUnset || c.min_stock === 0)) : []
   const scopeLabel =
-    scope === 'all' ? 'tất cả linh kiện' : scope === 'none' ? 'nhóm chưa phân loại' : `loại ${categories.find((c) => c.id === scope)?.name ?? ''}`
+    scope === 'all' ? 'tất cả linh kiện' : scope === 'none' ? 'nhóm chưa phân loại' : `danh mục ${categoriesById.get(scope)?.name ?? ''}`
 
   const unsetCount = useMemo(() => components.filter((c) => c.min_stock === 0).length, [components])
   const matches = useMemo(() => {
@@ -57,27 +55,11 @@ export default function SettingsPage() {
     })
   }, [components, searchText, q, unsetOnly])
 
-  async function renameCategory(category, name) {
-    mustChange(await supabase.from('categories').update({ name }).eq('id', category.id).select('id'))
-    await reload()
-    toast.push({ message: `Đã đổi tên loại thành ${name}.` })
-  }
-
-  async function deleteCategory(category) {
-    // Gỡ loại khỏi các linh kiện trước, để chúng trở về "Chưa phân loại" thay vì chặn việc xóa
-    const { error: err } = await supabase.from('components').update({ category_id: null }).eq('category_id', category.id)
-    if (err) throw err
-    mustChange(await supabase.from('categories').delete().eq('id', category.id).select('id'))
-    if (scope === category.id) setScope('')
-    await reload()
-    toast.push({ message: `Đã xóa loại ${category.name}.` })
-  }
-
   async function applyBulk() {
     let query = supabase.from('components').update({ min_stock: Number(level) })
     if (scope === 'none') query = query.is('category_id', null)
     else if (scope === 'all') query = query.gte('min_stock', 0)
-    else query = query.eq('category_id', scope)
+    else query = query.in('category_id', scopeIds)
     if (onlyUnset) query = query.eq('min_stock', 0)
     const changed = mustChange(await query.select('id'))
     await reload()
@@ -107,7 +89,6 @@ export default function SettingsPage() {
   }
 
   const levelValid = Number.isInteger(Number(level)) && level !== '' && Number(level) >= 0
-  const taken = (exceptId) => categories.filter((c) => c.id !== exceptId).map((c) => normalize(c.name))
 
   return (
     <div className={`kk-page kk-settings ${refreshing ? 'is-refreshing' : ''}`}>
@@ -117,7 +98,9 @@ export default function SettingsPage() {
           <p>
             {isAdmin
               ? 'Quản lý danh mục, mức cảnh báo sắp hết hàng và thành viên.'
-              : 'Xem danh mục, mức cảnh báo và quản lý tài khoản của bạn. Chỉ admin mới sửa được danh mục và mức cảnh báo.'}
+              : canEdit
+                ? 'Thêm danh mục, xem mức cảnh báo và quản lý tài khoản của bạn. Đổi tên, chuyển, xóa danh mục và đặt mức cảnh báo là việc của admin.'
+                : 'Xem danh mục, mức cảnh báo và quản lý tài khoản của bạn.'}
           </p>
         </div>
       </div>
@@ -133,72 +116,7 @@ export default function SettingsPage() {
       )}
       {isAdmin && !profile.legacy && <SettingsMembers />}
 
-      {/* ---- Danh mục ---- */}
-      <section className="kk-card" aria-labelledby="set-cat">
-        <div className="kk-card-head">
-          <div>
-            <h2 id="set-cat">Danh mục linh kiện</h2>
-            <p className="kk-card-sub">Các loại dùng để phân nhóm, lọc và vẽ biểu đồ tồn kho.</p>
-          </div>
-          {isAdmin && (
-            <button type="button" className="kk-btn kk-btn-soft kk-btn-sm" onClick={() => setDialog({ kind: 'add' })}>
-              <Plus size={16} />
-              Thêm loại
-            </button>
-          )}
-        </div>
-        {loading ? (
-          <div className="kk-skel-list">
-            <Skeleton h={40} r={10} />
-            <Skeleton h={40} r={10} />
-            <Skeleton h={40} r={10} />
-          </div>
-        ) : categories.length === 0 ? (
-          <p className="kk-muted-text">Chưa có loại nào. Thêm loại đầu tiên, ví dụ MCU, Điện trở, Tụ điện.</p>
-        ) : (
-          <ul className="kk-rows">
-            {categories.map((c) => {
-              const count = countByCategory.get(c.id) ?? 0
-              return (
-                <li key={c.id}>
-                  <i className={`kk-dot kk-tone-${toneByCategory.get(c.id) ?? 'x'}`} aria-hidden="true" />
-                  <span className="kk-rows-name">{c.name}</span>
-                  <span className="kk-rows-meta">{fmtNum(count)} linh kiện</span>
-                  {isAdmin && (
-                    <>
-                      <button
-                        type="button"
-                        className="kk-icon-btn"
-                        aria-label={`Đổi tên loại ${c.name}`}
-                        title="Đổi tên"
-                        onClick={() => setDialog({ kind: 'rename', category: c })}
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      <button
-                        type="button"
-                        className="kk-icon-btn"
-                        aria-label={`Xóa loại ${c.name}`}
-                        title="Xóa loại"
-                        onClick={() => setDialog({ kind: 'delete', category: c, count })}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </>
-                  )}
-                </li>
-              )
-            })}
-            {(countByCategory.get('none') ?? 0) > 0 && (
-              <li className={`kk-rows-muted ${isAdmin ? 'kk-rows-plain' : ''}`}>
-                <i className="kk-dot kk-tone-x" aria-hidden="true" />
-                <span className="kk-rows-name">Chưa phân loại</span>
-                <span className="kk-rows-meta">{fmtNum(countByCategory.get('none'))} linh kiện</span>
-              </li>
-            )}
-          </ul>
-        )}
-      </section>
+      <SettingsCategories />
 
       {/* ---- Mức cảnh báo ---- */}
       <section className="kk-card" aria-labelledby="set-min">
@@ -222,7 +140,7 @@ export default function SettingsPage() {
               <option value="all">Tất cả linh kiện</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name}
+                  {indentLabel(c)}
                 </option>
               ))}
               <option value="none">Chưa phân loại</option>
@@ -334,45 +252,6 @@ export default function SettingsPage() {
 
       <SettingsAccount />
 
-      {dialog?.kind === 'add' && (
-        <NameDialog
-          title="Thêm loại linh kiện"
-          label="Tên loại"
-          placeholder="Vd: MCU, Điện trở, Tụ điện"
-          submitLabel="Thêm loại"
-          validate={(name) => (taken(null).includes(normalize(name)) ? 'Đã có loại trùng tên này.' : '')}
-          onSubmit={async (name) => {
-            await createCategory(name)
-            toast.push({ message: `Đã thêm loại ${name}.` })
-          }}
-          onClose={() => setDialog(null)}
-        />
-      )}
-      {dialog?.kind === 'rename' && (
-        <NameDialog
-          title="Đổi tên loại"
-          label="Tên mới"
-          initial={dialog.category.name}
-          submitLabel="Lưu tên mới"
-          validate={(name) => (taken(dialog.category.id).includes(normalize(name)) ? 'Đã có loại trùng tên này.' : '')}
-          onSubmit={(name) => renameCategory(dialog.category, name)}
-          onClose={() => setDialog(null)}
-        />
-      )}
-      {dialog?.kind === 'delete' && (
-        <ConfirmDialog
-          title={`Xóa loại ${dialog.category.name}?`}
-          text={
-            dialog.count > 0
-              ? `${fmtNum(dialog.count)} linh kiện đang thuộc loại này sẽ chuyển về "Chưa phân loại". Linh kiện và tồn kho không bị xóa.`
-              : 'Loại này chưa có linh kiện nào nên xóa sẽ không ảnh hưởng gì đến kho.'
-          }
-          confirmLabel="Xóa loại"
-          Icon={Trash2}
-          onConfirm={() => deleteCategory(dialog.category)}
-          onClose={() => setDialog(null)}
-        />
-      )}
       {dialog?.kind === 'bulk' && (
         <ConfirmDialog
           title={`Đặt mức cảnh báo ${fmtNum(level)} cho ${fmtNum(targets.length)} linh kiện?`}

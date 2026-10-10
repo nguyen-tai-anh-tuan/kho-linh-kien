@@ -65,10 +65,10 @@ export function StatusChip({ status }) {
   )
 }
 
-export function CategoryChip({ name, tone }) {
+export function CategoryChip({ name, tone, title }) {
   if (!name) return <span className="kk-chip kk-chip-none">Chưa phân loại</span>
   return (
-    <span className="kk-chip">
+    <span className="kk-chip" title={title}>
       <i className={`kk-dot kk-tone-${tone ?? 'x'}`} aria-hidden="true" />
       {name}
     </span>
@@ -254,6 +254,123 @@ export function QtyStepper({ value, onChange, min = 0, id, label = 'Số lượn
       <button type="button" aria-label="Tăng 1" onClick={inc}>
         <Plus size={16} />
       </button>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Ô tìm và chọn danh mục: hiện đường dẫn đầy đủ "Lớn › Con › Chi tiết" */
+/* ------------------------------------------------------------------ */
+export function CategoryPicker({ id, value, onChange }) {
+  const { categories, categoriesById } = useData()
+  const [q, setQ] = useState('')
+  const [open, setOpen] = useState(false)
+  const [hi, setHi] = useState(0)
+  const listId = useId()
+  const selected = value ? categoriesById.get(value) : null
+
+  // Dòng đầu luôn là "Chưa phân loại" để bỏ chọn
+  const results = useMemo(() => {
+    const terms = normalize(q).split(/\s+/).filter(Boolean)
+    const list = terms.length
+      ? categories.filter((c) => {
+          const text = normalize(c.path)
+          return terms.every((t) => text.includes(t))
+        })
+      : categories
+    return [null, ...list]
+  }, [q, categories])
+
+  function pick(c) {
+    onChange(c ? c.id : null)
+    setOpen(false)
+    setQ('')
+  }
+
+  if (selected) {
+    return (
+      <div className="kk-picked">
+        <div className="kk-picked-text">
+          <strong>{selected.name}</strong>
+          {selected.depth > 0 && <span>{selected.path.slice(0, -(selected.name.length + 3))}</span>}
+        </div>
+        <button
+          type="button"
+          className="kk-link"
+          onClick={() => {
+            onChange(null)
+            setOpen(true)
+          }}
+        >
+          Đổi
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="kk-combo">
+      <input
+        id={id}
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-autocomplete="list"
+        aria-activedescendant={open && results[hi] !== undefined ? `${listId}-${hi}` : undefined}
+        autoComplete="off"
+        placeholder="Chưa phân loại. Gõ để tìm danh mục…"
+        value={q}
+        onChange={(e) => {
+          setQ(e.target.value)
+          setOpen(true)
+          setHi(e.target.value ? 1 : 0)
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault()
+            setOpen(true)
+            setHi((h) => Math.min(h + 1, results.length - 1))
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault()
+            setHi((h) => Math.max(h - 1, 0))
+          } else if (e.key === 'Enter' && open && results[hi] !== undefined) {
+            e.preventDefault()
+            pick(results[hi])
+          } else if (e.key === 'Escape' && open) {
+            e.stopPropagation()
+            setOpen(false)
+          }
+        }}
+      />
+      {open && (
+        <ul className="kk-combo-list kk-cat-list" id={listId} role="listbox" tabIndex={-1}>
+          {results.map((c, i) => (
+            <li
+              key={c ? c.id : 'none'}
+              id={`${listId}-${i}`}
+              role="option"
+              aria-selected={i === hi}
+              className={i === hi ? 'is-hi' : ''}
+              style={c && !q ? { paddingLeft: 10 + c.depth * 16 } : undefined}
+              onMouseDown={(e) => e.preventDefault()}
+              onMouseEnter={() => setHi(i)}
+              onClick={() => pick(c)}
+            >
+              {c ? (
+                <span className="kk-combo-main">
+                  <strong className={c.depth === 0 ? '' : 'kk-cat-sub'}>{c.name}</strong>
+                  {q && c.depth > 0 && <span>{c.path.slice(0, -(c.name.length + 3))}</span>}
+                </span>
+              ) : (
+                <span className="kk-combo-main kk-cat-none">Chưa phân loại</span>
+              )}
+            </li>
+          ))}
+          {results.length === 1 && q && <li className="kk-combo-empty">Không có danh mục nào khớp. Bạn có thể thêm danh mục mới trong trang Cài đặt.</li>}
+        </ul>
+      )}
     </div>
   )
 }

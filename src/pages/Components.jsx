@@ -19,6 +19,7 @@ import { useShell } from '../ShellContext'
 import { CategoryChip, EmptyState, Skeleton, StatusChip, StockBar } from '../ui/common'
 import { downloadCSV } from '../lib/csv'
 import { fmtNum, fmtPrice, normalize } from '../lib/format'
+import { indentLabel, subtreeIds } from '../lib/tree'
 
 const PAGE_SIZE = 25
 const STATUS_ORDER = { out: 0, low: 1, ok: 2 }
@@ -36,6 +37,8 @@ export default function ComponentsPage() {
   const {
     components,
     categories,
+    categoriesById,
+    categoryChildren,
     locations,
     packages,
     stockByComponent,
@@ -81,18 +84,21 @@ export default function ComponentsPage() {
 
   const filtered = useMemo(() => {
     const terms = normalize(q).split(/\s+/).filter(Boolean)
+    // Lọc theo một danh mục thì tính luôn mọi danh mục nằm bên trong nó
+    const catIds = cat && cat !== 'none' ? new Set(subtreeIds(categoryChildren, cat)) : null
     return components.filter((c) => {
       if (terms.length) {
         const text = searchText.get(c.id) ?? ''
         if (!terms.every((t) => text.includes(t))) return false
       }
-      if (cat && (cat === 'none' ? c.category_id : c.category_id !== cat)) return false
+      if (cat === 'none' && c.category_id) return false
+      if (catIds && !catIds.has(c.category_id)) return false
       if (pkg && c.package !== pkg) return false
       if (loc && !(stockByComponent.get(c.id) ?? []).some((s) => s.location_id === loc)) return false
       if (low && c.status === 'ok') return false
       return true
     })
-  }, [components, searchText, stockByComponent, q, cat, pkg, loc, low])
+  }, [components, searchText, stockByComponent, categoryChildren, q, cat, pkg, loc, low])
 
   const sorted = useMemo(() => {
     const dir = sort.dir === 'asc' ? 1 : -1
@@ -160,7 +166,7 @@ export default function ComponentsPage() {
     const body = list.map((c) => [
       c.part_number,
       c.name,
-      c.category_name,
+      categoriesById.get(c.category_id)?.path ?? c.category_name,
       c.value,
       c.package,
       c.manufacturer,
@@ -234,7 +240,7 @@ export default function ComponentsPage() {
           <option value="">Mọi loại</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name}
+              {indentLabel(c)}
             </option>
           ))}
           <option value="none">Chưa phân loại</option>
@@ -392,7 +398,11 @@ export default function ComponentsPage() {
                                 ? `${c.name}, ${c.value}`
                                 : c.name}
                             </span>
-                            <CategoryChip name={c.category_name} tone={toneByCategory.get(c.category_id)} />
+                            <CategoryChip
+                              name={c.category_name}
+                              tone={toneByCategory.get(c.category_id)}
+                              title={categoriesById.get(c.category_id)?.path}
+                            />
                           </span>
                         </td>
                         <td data-label="Package" className="kk-col-pkg">

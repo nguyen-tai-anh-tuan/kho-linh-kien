@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient'
-import { fetchAll, friendlyError } from '../lib/api'
+import { fetchAll, friendlyError, isMissingSchema } from '../lib/api'
 import { normalize } from '../lib/format'
+import { buildTree, byOrderThenName, flattenTree } from '../lib/tree'
 
 const DataContext = createContext(null)
 
@@ -14,6 +15,19 @@ export function useData() {
 const byName = (a, b) => a.name.localeCompare(b.name, 'vi')
 const byPath = (a, b) => a.path.localeCompare(b.path, 'vi')
 
+/** Cây danh mục kèm đường dẫn. Nếu chưa chạy sql/05_categories.sql thì dùng danh sách phẳng như trước. */
+async function loadCategories() {
+  const full = await supabase.from('categories_full').select('id,name,parent_id,sort_order,path,depth,root_id')
+  if (!full.error) return { tree: true, rows: full.data }
+  if (!isMissingSchema(full.error)) throw full.error
+  const flat = await supabase.from('categories').select('id,name').order('name')
+  if (flat.error) throw flat.error
+  return {
+    tree: false,
+    rows: flat.data.map((c) => ({ ...c, parent_id: null, sort_order: 0, path: c.name, depth: 0, root_id: c.id })),
+  }
+}
+
 export function DataProvider({ children }) {
   const [raw, setRaw] = useState({
     components: [],
@@ -24,6 +38,7 @@ export function DataProvider({ children }) {
   })
   const [status, setStatus] = useState({ loading: true, refreshing: false, error: null })
   const [version, setVersion] = useState(0)
+  const [categoryTree, setCategoryTree] = useState(true) // false: database chưa có danh mục nhiều tầng
   const alive = useRef(true)
 
   const load = useCallback(async () => {
@@ -42,7 +57,7 @@ export function DataProvider({ children }) {
             .order('component_id')
             .order('location_id'),
         ),
-        supabase.from('categories').select('id,name').order('name').then(must),
+        loadCategories(),
         supabase
           .from('locations_full')
           .select('id,name,parent_id,path,depth,qr_code')
@@ -51,7 +66,8 @@ export function DataProvider({ children }) {
         supabase.from('projects').select('id,name,description').order('name').then(must),
       ])
       if (!alive.current) return
-      setRaw({ components, stock, categories, locations, projects })
+      setCategoryTree(categories.tree)
+      setRaw({ components, stock, categories: categories.rows, locations, projects })
       setVersion((v) => v + 1)
       setStatus({ loading: false, refreshing: false, error: null })
     } catch (error) {
@@ -87,10 +103,14 @@ export function DataProvider({ children }) {
     }
     for (const list of stockByComponent.values()) list.sort(byPath)
 
-    // Mỗi loại một màu cố định (theo thứ tự tên), dùng chung cho chip và biểu đồ
-    const toneByCategory = new Map(
-      [...raw.categories].sort(byName).map((c, i) => [c.id, i % 6]),
-    )
+    // Cây danh mục: lớn -> con -> chi tiết. "categories" được xếp lại theo đúng thứ tự của cây.
+    const categoryChildren = buildTree(raw.categories, byOrderThenName)
+    const categories = flattenTree(categoryChildren)
+    const categoriesById = new Map(categories.map((c) => [c.id, c]))
+
+    // Mỗi danh mục lớn một màu cố định, các danh mục bên trong dùng chung màu của nó (chip và biểu đồ)
+    const rootTone = new Map((categoryChildren.get(null) ?? []).map((c, i) => [c.id, i % 6]))
+    const toneByCategory = new Map(categories.map((c) => [c.id, rootTone.get(c.root_id) ?? 0]))
 
     const packages = [...new Set(raw.components.map((c) => c.package).filter(Boolean))].sort((a, b) =>
       a.localeCompare(b, 'vi'),
@@ -100,12 +120,44 @@ export function DataProvider({ children }) {
     const searchText = new Map(
       raw.components.map((c) => [
         c.id,
-        normalize([c.part_number, c.name, c.value, c.package, c.manufacturer, c.category_name].filter(Boolean).join(' ')),
+        normalize(
+          [c.part_number, c.name, c.value, c.package, c.manufacturer, categoriesById.get(c.category_id)?.path ?? c.category_name]
+            .filter(Boolean)
+            .join(' '),
+        ),
       ]),
     )
 
-    return { locationsById, componentsById, stockMap, stockByComponent, toneByCategory, packages, searchText }
+    return {
+      locationsById,
+      componentsById,
+      stockMap,
+      stockByComponent,
+      categories,
+      categoriesById,
+      categoryChildren,
+      toneByCategory,
+      packages,
+      searchText,
+    }
   }, [raw])
+
+  /** Thêm danh mục (chỉ admin). parentId = null là danh mục lớn. Xếp sau cùng trong các danh mục cùng cha. */
+  const createCategory = useCallback(
+    async (name, parentId = null) => {
+      const clean = String(name ?? '').trim()
+      if (!clean) throw new Error('Tên không được để trống.')
+      const siblings = derived.categoryChildren.get(parentId) ?? []
+      const payload = categoryTree
+        ? { name: clean, parent_id: parentId, sort_order: Math.max(0, ...siblings.map((c) => c.sort_order ?? 0)) + 1 }
+        : { name: clean }
+      const { data, error } = await supabase.from('categories').insert(payload).select('id').single()
+      if (error) throw error
+      await load()
+      return data
+    },
+    [derived, categoryTree, load],
+  )
 
   const createNamed = useCallback(
     async (table, key, name) => {
@@ -131,12 +183,13 @@ export function DataProvider({ children }) {
       ...derived,
       ...status,
       version,
+      categoryTree,
       reload: load,
-      createCategory: (name) => createNamed('categories', 'categories', name),
+      createCategory,
       createLocation: (name) => createNamed('locations', 'locations', name),
       createProject: (name) => createNamed('projects', 'projects', name),
     }),
-    [raw, derived, status, version, load, createNamed],
+    [raw, derived, status, version, categoryTree, load, createNamed, createCategory],
   )
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

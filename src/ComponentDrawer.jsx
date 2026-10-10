@@ -23,7 +23,7 @@ import { fmtMoneyFull, fmtNum, fmtPrice, safeUrl, timeAgo } from './lib/format'
 const TYPE_LABEL = { in: 'Nhập', out: 'Xuất', adjust: 'Điều chỉnh' }
 
 export default function ComponentDrawer({ id, onClose }) {
-  const { componentsById, stockByComponent, toneByCategory, loading, version, reload } = useData()
+  const { componentsById, stockByComponent, categoriesById, toneByCategory, loading, version, reload } = useData()
   const { openTx } = useTx()
   const { openForm, canEdit, isAdmin } = useShell()
   const toast = useToast()
@@ -157,7 +157,11 @@ export default function ComponentDrawer({ id, onClose }) {
           <div>
             <dt>Loại</dt>
             <dd>
-              <CategoryChip name={c.category_name} tone={toneByCategory.get(c.category_id)} />
+              {categoriesById.get(c.category_id)?.depth > 0 ? (
+                categoriesById.get(c.category_id).path
+              ) : (
+                <CategoryChip name={c.category_name} tone={toneByCategory.get(c.category_id)} />
+              )}
             </dd>
           </div>
           <div>

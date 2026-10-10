@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { FileSpreadsheet, Loader2, Upload } from 'lucide-react'
 import { supabase } from './supabaseClient'
 import { useData } from './data/DataContext'
@@ -13,8 +13,8 @@ const MAX_ROWS = 2000
 
 const TEMPLATE = [
   ['part_number', 'name', 'category', 'value', 'package', 'manufacturer', 'min_stock', 'unit_price', 'location', 'quantity', 'datasheet_url', 'notes'],
-  ['ESP32-WROOM-32', 'ESP32 module', 'MCU', '', 'Module', 'Espressif', '5', '65000', 'Tủ A', '10', '', ''],
-  ['RC0603FR-0710KL', 'Điện trở 10k 1%', 'Điện trở', '10k', '0603', 'Yageo', '200', '0.35', 'Tủ B', '500', '', 'Cuộn 5000 cái'],
+  ['ESP32-WROOM-32', 'ESP32 module', 'Mạch WiFi', '', 'Module', 'Espressif', '5', '65000', 'Tủ A', '10', '', ''],
+  ['RC0603FR-0710KL', 'Điện trở 10k 1%', 'Linh Kiện Điện Tử Thụ Động › Điện Trở › Điện Trở Dán SMD', '10k', '0603', 'Yageo', '200', '0.35', 'Tủ B', '500', '', 'Cuộn 5000 cái'],
 ]
 
 /** Đọc và kiểm tra file CSV, chưa ghi gì vào database */
@@ -93,16 +93,82 @@ export function analyzeCsv(text, existingComponents) {
   return { items, errors, duplicates, total: rows.length - 1 }
 }
 
+/** Chuẩn hóa đường dẫn danh mục: nhận các dấu ngăn cách › > / và bỏ qua dấu, hoa thường */
+const PATH_SPLIT = /[›>/]/
+const pathKey = (text) =>
+  String(text)
+    .split(PATH_SPLIT)
+    .map(normalize)
+    .filter(Boolean)
+    .join('>')
+
 const chunk = (arr, n) => Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n))
 
 export default function ImportCsvModal({ onClose }) {
-  const { components, categories, locations, reload } = useData()
+  const { components, categories, categoryChildren, categoryTree, locations, reload } = useData()
   const toast = useToast()
   const inputRef = useRef(null)
   const [fileName, setFileName] = useState('')
   const [result, setResult] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  // Tìm danh mục theo đường dẫn đầy đủ ("IC › IC Nhớ › EEPROM") hoặc theo tên đơn ("EEPROM").
+  // Tên đơn chỉ được nhận khi cả cây chỉ có đúng một danh mục mang tên đó.
+  const resolveCategory = useMemo(() => {
+    const byPath = new Map()
+    const byName = new Map()
+    for (const c of categories) {
+      byPath.set(pathKey(c.path), c.id)
+      const key = normalize(c.name)
+      byName.set(key, byName.has(key) ? null : c.id)
+    }
+    return (text) => (text ? (byPath.get(pathKey(text)) ?? byName.get(normalize(text)) ?? null) : null)
+  }, [categories])
+
+  // Các loại ghi trong file mà cây chưa có: phần tạo mới được, và phần không dùng được
+  // (tên đơn trùng ở nhiều nhánh nên không biết chọn cái nào, hoặc đường dẫn sâu quá ba tầng)
+  const { toCreate, unusable } = useMemo(() => {
+    const toCreate = new Map() // pathKey -> các tên theo từng tầng
+    const unusable = new Set()
+    const names = new Set(categories.map((c) => normalize(c.name)))
+    for (const it of result?.items ?? []) {
+      const text = it.category
+      if (!text || resolveCategory(text)) continue
+      const parts = String(text).split(PATH_SPLIT).map((s) => s.trim()).filter(Boolean)
+      const ambiguous = parts.length === 1 && names.has(normalize(parts[0]))
+      const tooDeep = parts.length > 3 || (!categoryTree && parts.length > 1)
+      if (parts.length === 0 || ambiguous || tooDeep) unusable.add(text)
+      else toCreate.set(pathKey(text), parts)
+    }
+    return { toCreate, unusable: [...unusable] }
+  }, [result, categories, categoryTree, resolveCategory])
+
+  /** Tạo các danh mục còn thiếu, đi từ tầng lớn xuống. Trả về Map: pathKey -> id */
+  async function createMissingCategories() {
+    const idByPath = new Map(categories.map((c) => [pathKey(c.path), c.id]))
+    const nextOrder = new Map() // id cha -> thứ tự kế tiếp
+    const orderFor = (parentId) => {
+      const start = nextOrder.get(parentId) ?? Math.max(0, ...(categoryChildren.get(parentId) ?? []).map((c) => c.sort_order ?? 0)) + 1
+      nextOrder.set(parentId, start + 1)
+      return start
+    }
+    for (const parts of toCreate.values()) {
+      let parentId = null
+      let key = ''
+      for (const name of parts) {
+        key = key ? `${key}>${normalize(name)}` : normalize(name)
+        if (!idByPath.has(key)) {
+          const payload = categoryTree ? { name, parent_id: parentId, sort_order: orderFor(parentId) } : { name }
+          const { data, error: err } = await supabase.from('categories').insert(payload).select('id').single()
+          if (err) throw err
+          idByPath.set(key, data.id)
+        }
+        parentId = idByPath.get(key)
+      }
+    }
+    return idByPath
+  }
 
   async function onFile(e) {
     const file = e.target.files?.[0]
@@ -121,20 +187,8 @@ export default function ImportCsvModal({ onClose }) {
     setBusy(true)
     setError('')
     try {
-      // 1) Tạo các loại mới
-      const catIds = new Map(categories.map((c) => [normalize(c.name), c.id]))
-      const newCats = new Map()
-      items.forEach((it) => {
-        if (it.category && !catIds.has(normalize(it.category))) newCats.set(normalize(it.category), it.category)
-      })
-      if (newCats.size) {
-        const { data, error: err } = await supabase
-          .from('categories')
-          .insert([...newCats.values()].map((name) => ({ name })))
-          .select('id,name')
-        if (err) throw err
-        data.forEach((c) => catIds.set(normalize(c.name), c.id))
-      }
+      // 1) Tạo các danh mục mà cây chưa có
+      const newCategoryIds = await createMissingCategories()
 
       // 2) Tạo các vị trí mới (khớp theo đường dẫn đầy đủ hoặc theo tên)
       const locIds = new Map()
@@ -164,7 +218,7 @@ export default function ImportCsvModal({ onClose }) {
             part.map((it) => ({
               part_number: it.part_number,
               name: it.name,
-              category_id: it.category ? catIds.get(normalize(it.category)) : null,
+              category_id: resolveCategory(it.category) ?? (it.category ? (newCategoryIds.get(pathKey(it.category)) ?? null) : null),
               value: it.value || null,
               package: it.package || null,
               manufacturer: it.manufacturer || null,
@@ -230,7 +284,8 @@ export default function ImportCsvModal({ onClose }) {
       <div className="kk-import">
         <p className="kk-explain">
           Dòng đầu tiên là tên cột. Bắt buộc có <b>part_number</b> (mã) và <b>name</b> (tên). Các cột khác không bắt buộc: category, value,
-          package, manufacturer, min_stock, unit_price, location, quantity, datasheet_url, notes. Mã đã có trong kho sẽ được bỏ qua.
+          package, manufacturer, min_stock, unit_price, location, quantity, datasheet_url, notes. Cột category nhận tên danh mục (vd: EEPROM)
+          hoặc đường dẫn đầy đủ (vd: IC - Mạch tích hợp › IC Nhớ › EEPROM). Mã đã có trong kho sẽ được bỏ qua.
         </p>
         <div className="kk-import-actions">
           <input ref={inputRef} type="file" accept=".csv,.txt,text/csv" onChange={onFile} className="kk-file" aria-label="Chọn file CSV" />
@@ -263,6 +318,20 @@ export default function ImportCsvModal({ onClose }) {
               {result.errors.length > 0 && (
                 <li className="kk-warn-text">
                   <strong>{fmtNum(result.errors.length)}</strong> dòng có lỗi, sẽ không được nhập
+                </li>
+              )}
+              {toCreate.size > 0 && (
+                <li>
+                  <strong>{fmtNum(toCreate.size)}</strong> danh mục chưa có trong cây, sẽ được tạo mới:{' '}
+                  {[...toCreate.values()].slice(0, 5).map((parts) => parts.join(' › ')).join('; ')}
+                  {toCreate.size > 5 ? '…' : ''}
+                </li>
+              )}
+              {unusable.length > 0 && (
+                <li className="kk-warn-text">
+                  <strong>{fmtNum(unusable.length)}</strong> loại không dùng được (tên trùng ở nhiều nhánh nên cần ghi đường dẫn đầy đủ, hoặc
+                  sâu quá ba tầng). Các linh kiện đó sẽ để "Chưa phân loại": {unusable.slice(0, 5).join('; ')}
+                  {unusable.length > 5 ? '…' : ''}
                 </li>
               )}
             </ul>

@@ -4,7 +4,7 @@ import { supabase } from './supabaseClient'
 import { useData } from './data/DataContext'
 import { useToast } from './ui/Toast'
 import { Modal } from './ui/Modal'
-import { Field, QtyStepper, SelectWithCreate } from './ui/common'
+import { CategoryPicker, Field, QtyStepper, SelectWithCreate } from './ui/common'
 import { friendlyError } from './lib/api'
 import { parseNumber } from './lib/csv'
 import { normalize, safeUrl } from './lib/format'
@@ -13,7 +13,7 @@ const text = (v) => (v === null || v === undefined ? '' : String(v))
 
 /** Form thêm mới (initial = null) hoặc sửa linh kiện (initial = dòng từ component_totals) */
 export default function ComponentForm({ initial, onClose, onSaved }) {
-  const { components, categories, locations, createCategory, createLocation, reload } = useData()
+  const { components, locations, createLocation, reload } = useData()
   const toast = useToast()
   const editing = Boolean(initial)
 
@@ -161,15 +161,7 @@ export default function ComponentForm({ initial, onClose, onSaved }) {
         </Field>
 
         <Field label="Loại" htmlFor="cf-cat">
-          <SelectWithCreate
-            id="cf-cat"
-            value={f.category_id}
-            onChange={(id) => setF((s) => ({ ...s, category_id: id }))}
-            placeholder="Chưa phân loại"
-            options={categories.map((c) => ({ value: c.id, label: c.name }))}
-            onCreate={createCategory}
-            createLabel="Thêm loại mới (vd: MCU, Điện trở)"
-          />
+          <CategoryPicker id="cf-cat" value={f.category_id} onChange={(id) => setF((s) => ({ ...s, category_id: id }))} />
         </Field>
         <Field label="Giá trị" htmlFor="cf-value" hint="Vd: 10k, 100nF, 3.3V">
           <input id="cf-value" value={f.value} onChange={set('value')} />

@@ -31,6 +31,9 @@ export function friendlyError(error) {
   if (msg.includes('NO_ROWS_CHANGED')) {
     return 'Chưa có gì được thay đổi. Mục này có thể đã bị xóa, hoặc vai trò của bạn không được phép làm việc này.'
   }
+  if (msg.includes('CATEGORY_TOO_DEEP')) return 'Danh mục chỉ có ba tầng: lớn, con và chi tiết. Không đặt sâu hơn được.'
+  if (msg.includes('CATEGORY_CYCLE')) return 'Không thể chuyển một danh mục vào chính nó hoặc vào danh mục nằm bên trong nó.'
+  if (msg.includes('CATEGORY_HAS_CHILDREN')) return 'Danh mục này còn danh mục bên trong. Hãy xóa hoặc chuyển chúng đi trước.'
   if (msg.includes('LAST_ADMIN')) return 'Kho phải còn ít nhất một admin. Hãy cho người khác làm admin trước.'
   if (msg.includes('NOT_ADMIN')) return 'Chỉ admin mới làm được việc này.'
 
@@ -57,7 +60,11 @@ export function friendlyError(error) {
     low.includes('could not find the') ||
     low.includes('does not exist')
   ) {
-    const file = low.includes('project_bom') ? 'sql/03_pages.sql' : 'sql/02_dashboard.sql'
+    const file = low.includes('project_bom')
+      ? 'sql/03_pages.sql'
+      : /categor|sort_order/.test(low)
+        ? 'sql/05_categories.sql'
+        : 'sql/02_dashboard.sql'
     return `Database chưa được nâng cấp. Hãy chạy file ${file} trong Supabase (SQL Editor) rồi tải lại trang.`
   }
   if (low.includes('jwt') || low.includes('not authenticated')) {

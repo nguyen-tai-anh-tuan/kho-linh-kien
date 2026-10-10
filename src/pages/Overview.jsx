@@ -21,7 +21,7 @@ import { friendlyError } from '../lib/api'
 import { fmtDay, fmtMoney, fmtMoneyFull, fmtNum, greeting, timeAgo } from '../lib/format'
 
 export default function Overview() {
-  const { components, categories, toneByCategory, loading, refreshing, error, reload, version } = useData()
+  const { components, categories, categoriesById, toneByCategory, loading, refreshing, error, reload, version } = useData()
   const { openTx } = useTx()
   const { openComponent, openForm, canEdit } = useShell()
 
@@ -48,10 +48,11 @@ export default function Overview() {
   )
 
   const slices = useMemo(() => {
+    // Gộp theo danh mục lớn: món nằm ở danh mục con hay chi tiết đều tính vào danh mục lớn chứa nó
     const byCat = new Map()
     for (const c of components) {
       if (c.total_quantity <= 0) continue
-      const key = c.category_id ?? 'none'
+      const key = categoriesById.get(c.category_id)?.root_id ?? 'none'
       byCat.set(key, (byCat.get(key) ?? 0) + c.total_quantity)
     }
     const nameOf = new Map(categories.map((c) => [c.id, c.name]))
@@ -68,7 +69,7 @@ export default function Overview() {
     const result = head.map((s) => ({ ...s, color: `var(--series-${(s.tone ?? 0) + 1})` }))
     if (restValue > 0) result.push({ id: 'other', name: 'Khác', value: restValue, tone: null, color: 'var(--kk-other)' })
     return result
-  }, [components, categories, toneByCategory])
+  }, [components, categories, categoriesById, toneByCategory])
 
   /* ---- dữ liệu theo ngày và hoạt động gần đây ---- */
   const [flow, setFlow] = useState(null)
@@ -188,7 +189,7 @@ export default function Overview() {
         </ChartCard>
 
         <ChartCard
-          title="Tồn kho theo loại"
+          title="Tồn kho theo danh mục lớn"
           summary={`${fmtNum(stats.qty)} cái`}
           tableData={slices}
           tableColumns={[
