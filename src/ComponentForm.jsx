@@ -13,7 +13,7 @@ const text = (v) => (v === null || v === undefined ? '' : String(v))
 
 /** Form thêm mới (initial = null) hoặc sửa linh kiện (initial = dòng từ component_totals) */
 export default function ComponentForm({ initial, onClose, onSaved }) {
-  const { components, locations, createLocation, reload } = useData()
+  const { allComponents: components, locations, createLocation, reload } = useData()
   const toast = useToast()
   const editing = Boolean(initial)
 

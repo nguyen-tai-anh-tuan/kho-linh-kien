@@ -36,7 +36,8 @@ const COLUMNS = [
 
 export default function ComponentsPage() {
   const {
-    components,
+    components: active,
+    archivedComponents,
     categoriesById,
     categoryChildren,
     locations,
@@ -61,7 +62,9 @@ export default function ComponentsPage() {
   const pkg = params.get('pkg') ?? ''
   const loc = params.get('loc') ?? ''
   const low = params.get('low') === '1'
+  const arc = params.get('arc') === '1' // đang xem các linh kiện ngừng dùng
   const hasFilter = Boolean(q || cat || pkg || loc || low)
+  const components = arc ? archivedComponents : active
 
   function setParam(key, value) {
     // Dùng dạng hàm để luôn lấy bộ lọc mới nhất, kể cả khi gõ phím rất nhanh
@@ -78,7 +81,7 @@ export default function ComponentsPage() {
   }
 
   function clearFilters() {
-    setParams(new URLSearchParams(), { replace: true })
+    setParams(new URLSearchParams(arc ? { arc: '1' } : {}), { replace: true })
     setPage(0)
   }
 
@@ -196,7 +199,7 @@ export default function ComponentsPage() {
         <div>
           <h1>Linh kiện</h1>
           <p>
-            {loading ? 'Đang tải…' : `${fmtNum(components.length)} mã`}
+            {loading ? 'Đang tải…' : `${fmtNum(components.length)} mã${arc ? ' ngừng dùng' : ''}`}
             {!loading && hasFilter ? `, đang hiện ${fmtNum(filtered.length)}` : ''}
           </p>
         </div>
@@ -258,6 +261,13 @@ export default function ComponentsPage() {
           <span className="kk-switch-track" aria-hidden="true" />
           Chỉ hiện sắp hết
         </label>
+        {(arc || archivedComponents.length > 0) && (
+          <label className="kk-switch">
+            <input type="checkbox" checked={arc} onChange={(e) => setParam('arc', e.target.checked ? '1' : '')} />
+            <span className="kk-switch-track" aria-hidden="true" />
+            Xem linh kiện ngừng dùng ({fmtNum(archivedComponents.length)})
+          </label>
+        )}
         {hasFilter && (
           <button type="button" className="kk-link" onClick={clearFilters}>
             Xóa bộ lọc
@@ -291,6 +301,12 @@ export default function ComponentsPage() {
               <Skeleton key={i} h={52} r={10} />
             ))}
           </div>
+        ) : arc && components.length === 0 ? (
+          <EmptyState title="Không có linh kiện nào đang ngừng dùng" text="Tắt công tắc để quay lại danh sách linh kiện đang dùng.">
+            <button type="button" className="kk-btn kk-btn-outline" onClick={() => setParam('arc', '')}>
+              Về danh sách đang dùng
+            </button>
+          </EmptyState>
         ) : components.length === 0 ? (
           <EmptyState
             title="Chưa có linh kiện nào"
@@ -384,6 +400,7 @@ export default function ComponentsPage() {
                           >
                             {c.part_number}
                           </button>
+                          {c.archived_at && <span className="kk-chip kk-chip-none kk-chip-archived">Ngừng dùng</span>}
                           <span className="kk-cell-sub">
                             <span className="kk-cell-name">
                               {c.value && !normalize(c.name).includes(normalize(c.value))

@@ -112,7 +112,11 @@ export function DataProvider({ children }) {
     const rootTone = new Map((categoryChildren.get(null) ?? []).map((c, i) => [c.id, i % 6]))
     const toneByCategory = new Map(categories.map((c) => [c.id, rootTone.get(c.root_id) ?? 0]))
 
-    const packages = [...new Set(raw.components.map((c) => c.package).filter(Boolean))].sort((a, b) =>
+    // Linh kiện ngừng dùng bị ẩn khỏi danh sách, thống kê và các ô chọn, nhưng lịch sử vẫn tra được qua componentsById
+    const components = raw.components.filter((c) => !c.archived_at)
+    const archivedComponents = raw.components.filter((c) => c.archived_at)
+
+    const packages = [...new Set(components.map((c) => c.package).filter(Boolean))].sort((a, b) =>
       a.localeCompare(b, 'vi'),
     )
 
@@ -129,6 +133,9 @@ export function DataProvider({ children }) {
     )
 
     return {
+      components,
+      archivedComponents,
+      allComponents: raw.components,
       locationsById,
       componentsById,
       stockMap,

@@ -2836,3 +2836,12 @@ button.kk-mega-name:hover {
     flex: 1 1 100%;
   }
 }
+
+/* Linh kiện ngừng dùng */
+.kk-chip-archived {
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.kk-detail-banner {
+  margin-bottom: 14px;
+}

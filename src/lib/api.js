@@ -42,7 +42,7 @@ export function friendlyError(error) {
     return `Không đủ tồn kho để xuất${detail}. Hãy giảm số lượng hoặc kiểm tra lại vị trí.`
   }
   if (code === '23503') {
-    return 'Dữ liệu này đang được dùng ở nơi khác (ví dụ linh kiện đã có lịch sử nhập/xuất) nên chưa thể xóa.'
+    return 'Dữ liệu này đang được dùng ở nơi khác (ví dụ linh kiện đã có lịch sử nhập/xuất) nên chưa thể xóa. Với linh kiện, hãy bấm "Ngừng dùng" để ẩn nó đi.'
   }
   if (code === '23505') return 'Dữ liệu bị trùng với một mục đã có.'
   if (code === '23514') return 'Giá trị nhập vào không hợp lệ (ví dụ số lượng phải lớn hơn 0).'
@@ -55,6 +55,7 @@ export function friendlyError(error) {
   if (
     code === 'PGRST205' ||
     code === 'PGRST202' ||
+    code === 'PGRST204' ||
     code === '42P01' ||
     code === '42703' ||
     low.includes('could not find the') ||
@@ -62,9 +63,11 @@ export function friendlyError(error) {
   ) {
     const file = low.includes('project_bom')
       ? 'sql/03_pages.sql'
-      : /categor|sort_order/.test(low)
-        ? 'sql/05_categories.sql'
-        : 'sql/02_dashboard.sql'
+      : /archived_at|delete_component/.test(low)
+        ? 'sql/06_archive.sql'
+        : /categor|sort_order/.test(low)
+          ? 'sql/05_categories.sql'
+          : 'sql/02_dashboard.sql'
     return `Database chưa được nâng cấp. Hãy chạy file ${file} trong Supabase (SQL Editor) rồi tải lại trang.`
   }
   if (low.includes('jwt') || low.includes('not authenticated')) {

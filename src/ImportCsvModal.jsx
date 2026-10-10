@@ -105,7 +105,7 @@ const pathKey = (text) =>
 const chunk = (arr, n) => Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n))
 
 export default function ImportCsvModal({ onClose }) {
-  const { components, categories, categoryChildren, categoryTree, locations, reload } = useData()
+  const { allComponents: components, categories, categoryChildren, categoryTree, locations, reload } = useData()
   const toast = useToast()
   const inputRef = useRef(null)
   const [fileName, setFileName] = useState('')

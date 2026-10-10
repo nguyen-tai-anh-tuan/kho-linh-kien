@@ -3,10 +3,12 @@ import { Link } from 'react-router-dom'
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
+  EyeOff,
   ExternalLink,
   FileText,
   Loader2,
   Pencil,
+  RotateCcw,
   SlidersHorizontal,
   Trash2,
 } from 'lucide-react'
@@ -17,7 +19,7 @@ import { useShell } from './ShellContext'
 import { useToast } from './ui/Toast'
 import { Modal } from './ui/Modal'
 import { CategoryChip, Skeleton, StatusChip, StockBar } from './ui/common'
-import { friendlyError } from './lib/api'
+import { friendlyError, isMissingSchema, mustChange } from './lib/api'
 import { fmtMoneyFull, fmtNum, fmtPrice, safeUrl, timeAgo } from './lib/format'
 
 const TYPE_LABEL = { in: 'Nhập', out: 'Xuất', adjust: 'Điều chỉnh' }
@@ -32,6 +34,7 @@ export default function ComponentDrawer({ id, onClose }) {
   const [history, setHistory] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [archiving, setArchiving] = useState(false)
   const [imgFailed, setImgFailed] = useState(false)
 
   useEffect(() => {
@@ -51,9 +54,43 @@ export default function ComponentDrawer({ id, onClose }) {
     }
   }, [id, version])
 
+  // Ngừng dùng / dùng lại: chỉ ẩn linh kiện, không đụng tới tồn kho và lịch sử
+  async function setArchived(on) {
+    setArchiving(true)
+    try {
+      mustChange(
+        await supabase
+          .from('components')
+          .update({ archived_at: on ? new Date().toISOString() : null })
+          .eq('id', id)
+          .select('id'),
+      )
+      await reload()
+      toast.push({
+        message: on
+          ? `Đã ngừng dùng ${c?.part_number ?? ''}. Bật "Xem linh kiện ngừng dùng" ở trang Linh kiện để tìm lại.`
+          : `Đã dùng lại ${c?.part_number ?? ''}.`,
+      })
+    } catch (e) {
+      toast.push({ tone: 'error', message: friendlyError(e), duration: 9000 })
+    } finally {
+      setArchiving(false)
+    }
+  }
+
+  // Xóa hẳn (chỉ admin): xóa luôn lịch sử nhập/xuất, tồn kho và các dòng BOM của linh kiện
   async function remove() {
     setDeleting(true)
-    const { error } = await supabase.from('components').delete().eq('id', id)
+    let { error } = await supabase.rpc('delete_component', { target: id })
+    // Database chưa chạy sql/06_archive.sql: xóa kiểu cũ, chỉ được với linh kiện chưa có lịch sử
+    if (error && isMissingSchema(error)) {
+      const plain = await supabase.from('components').delete().eq('id', id)
+      error = plain.error
+        ? plain.error.code === '23503'
+          ? new Error('Could not find the function delete_component')
+          : plain.error
+        : null
+    }
     if (error) {
       setDeleting(false)
       setConfirmDelete(false)
@@ -80,6 +117,7 @@ export default function ComponentDrawer({ id, onClose }) {
     )
   }
 
+  const archived = Boolean(c.archived_at)
   const where = stockByComponent.get(id) ?? []
   const datasheet = safeUrl(c.datasheet_url)
   const image = !imgFailed ? safeUrl(c.image_url) : null
@@ -95,14 +133,33 @@ export default function ComponentDrawer({ id, onClose }) {
       footer={
         !canEdit ? null : confirmDelete ? (
           <>
-            <span className="kk-foot-note kk-foot-warn">Xóa {c.part_number}? Không thể hoàn tác.</span>
+            <span className="kk-foot-note kk-foot-warn">
+              Xóa hẳn {c.part_number}? Toàn bộ lịch sử nhập/xuất, tồn kho và dòng BOM của nó cũng bị xóa. Không thể hoàn tác.
+            </span>
             <button type="button" className="kk-btn kk-btn-ghost" onClick={() => setConfirmDelete(false)} disabled={deleting}>
               Giữ lại
             </button>
             <button type="button" className="kk-btn kk-btn-danger" onClick={remove} disabled={deleting}>
               {deleting ? <Loader2 size={18} className="kk-spin" /> : <Trash2 size={18} />}
-              Xóa linh kiện
+              Xóa hẳn
             </button>
+          </>
+        ) : archived ? (
+          <>
+            <button type="button" className="kk-btn kk-btn-primary" onClick={() => setArchived(false)} disabled={archiving}>
+              {archiving ? <Loader2 size={18} className="kk-spin" /> : <RotateCcw size={18} />}
+              Dùng lại
+            </button>
+            <button type="button" className="kk-btn kk-btn-outline" onClick={() => openForm(c)}>
+              <Pencil size={18} />
+              Sửa
+            </button>
+            {isAdmin && (
+              <button type="button" className="kk-btn kk-btn-ghost kk-push-right" onClick={() => setConfirmDelete(true)}>
+                <Trash2 size={18} />
+                Xóa hẳn
+              </button>
+            )}
           </>
         ) : (
           <>
@@ -124,10 +181,20 @@ export default function ComponentDrawer({ id, onClose }) {
               <Pencil size={18} />
               Sửa
             </button>
+            <button
+              type="button"
+              className="kk-btn kk-btn-ghost kk-push-right"
+              title="Ẩn khỏi danh sách và các ô chọn. Lịch sử vẫn giữ nguyên, sau này bật lại được."
+              onClick={() => setArchived(true)}
+              disabled={archiving}
+            >
+              {archiving ? <Loader2 size={18} className="kk-spin" /> : <EyeOff size={18} />}
+              Ngừng dùng
+            </button>
             {isAdmin && (
-              <button type="button" className="kk-btn kk-btn-ghost kk-push-right" onClick={() => setConfirmDelete(true)}>
+              <button type="button" className="kk-btn kk-btn-ghost" onClick={() => setConfirmDelete(true)}>
                 <Trash2 size={18} />
-                Xóa
+                Xóa hẳn
               </button>
             )}
           </>
@@ -135,6 +202,15 @@ export default function ComponentDrawer({ id, onClose }) {
       }
     >
       <div className="kk-detail">
+        {archived && (
+          <p className="kk-banner kk-banner-warn kk-detail-banner" role="status">
+            <EyeOff size={18} aria-hidden="true" />
+            <span>
+              Linh kiện này đang ngừng dùng nên không hiện trong danh sách, thống kê và các ô chọn.
+              {c.total_quantity > 0 && ` Trong kho vẫn còn ${fmtNum(c.total_quantity)} cái.`}
+            </span>
+          </p>
+        )}
         <div className="kk-detail-top">
           {image && (
             <img
