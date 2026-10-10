@@ -2845,3 +2845,20 @@ button.kk-mega-name:hover {
 .kk-detail-banner {
   margin-bottom: 14px;
 }
+
+/* Trang Cần mua */
+.kk-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.kk-table .kk-shortage {
+  margin-left: 0;
+}
+.kk-col-buy {
+  width: 96px;
+  text-align: right;
+}
+.kk-tabbar > button:not(.kk-fab) {
+  position: relative;
+}

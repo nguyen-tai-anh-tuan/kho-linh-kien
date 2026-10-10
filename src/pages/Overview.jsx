@@ -208,9 +208,9 @@ export default function Overview() {
         <div className="kk-card">
           <div className="kk-card-head">
             <h2>Cần mua thêm</h2>
-            {toBuy.length > 6 && (
-              <Link className="kk-link" to="/components?low=1">
-                Xem tất cả {fmtNum(toBuy.length)} món
+            {toBuy.length > 0 && (
+              <Link className="kk-link" to="/buy">
+                Mở trang Cần mua
               </Link>
             )}
           </div>

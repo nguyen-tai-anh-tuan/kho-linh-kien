@@ -17,6 +17,7 @@ import {
   Plus,
   Search,
   Settings,
+  ShoppingCart,
   Sun,
 } from 'lucide-react'
 import { signOutHere, supabase } from './supabaseClient'
@@ -29,6 +30,7 @@ import { ShellContext } from './ShellContext'
 import { canEdit, isAdmin, roleLabel } from './lib/roles'
 import Overview from './pages/Overview'
 import ComponentsPage from './pages/Components'
+import ShoppingPage from './pages/Shopping'
 import LocationsPage from './pages/Locations'
 import ProjectsPage from './pages/Projects'
 import HistoryPage from './pages/History'
@@ -58,7 +60,7 @@ const MORE_PAGES = [
 ]
 // Trên điện thoại thanh tab chỉ đủ chỗ cho một trang nữa, các trang còn lại nằm trong mục "Khác"
 const TAB_PAGE = MORE_PAGES[0]
-const SHEET_PAGES = MORE_PAGES.slice(1)
+const SHEET_PAGES = [{ to: '/buy', label: 'Cần mua', Icon: ShoppingCart }, ...MORE_PAGES.slice(1)]
 
 export default function Dashboard({ session, profile, reloadProfile }) {
   return (
@@ -212,8 +214,12 @@ function Shell({ session, profile, reloadProfile }) {
             <NavLink to="/components" title="Linh kiện">
               <Boxes size={20} />
               <span className="kk-side-text">Linh kiện</span>
+            </NavLink>
+            <NavLink to="/buy" title="Cần mua">
+              <ShoppingCart size={20} />
+              <span className="kk-side-text">Cần mua</span>
               {attention > 0 && (
-                <span className="kk-badge" aria-label={`${attention} món sắp hết`}>
+                <span className="kk-badge" aria-label={`${attention} món hết hàng hoặc sắp hết`}>
                   {attention}
                 </span>
               )}
@@ -318,6 +324,7 @@ function Shell({ session, profile, reloadProfile }) {
             <Routes>
               <Route path="/" element={<Overview />} />
               <Route path="/components" element={<ComponentsPage />} />
+              <Route path="/buy" element={<ShoppingPage />} />
               <Route path="/locations" element={<LocationsPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/history" element={<HistoryPage />} />
@@ -335,7 +342,6 @@ function Shell({ session, profile, reloadProfile }) {
           <NavLink to="/components">
             <Boxes size={22} />
             <span>Linh kiện</span>
-            {attention > 0 && <i className="kk-tab-dot" aria-label={`${attention} món sắp hết`} />}
           </NavLink>
           {mayEdit && (
             <button type="button" className="kk-fab" onClick={() => openTx({ type: 'in' })} aria-label="Nhập / xuất kho">
@@ -349,6 +355,7 @@ function Shell({ session, profile, reloadProfile }) {
           <button type="button" className={onSheetPage ? 'active' : ''} aria-haspopup="dialog" onClick={() => setMenuOpen(true)}>
             <Menu size={22} />
             <span>Khác</span>
+            {attention > 0 && <i className="kk-tab-dot" aria-label={`${attention} món cần mua`} />}
           </button>
         </nav>
       </div>
@@ -360,6 +367,7 @@ function Shell({ session, profile, reloadProfile }) {
               <NavLink key={to} to={to} onClick={() => setMenuOpen(false)}>
                 <Icon size={20} />
                 {label}
+                {to === '/buy' && attention > 0 && <span className="kk-badge">{attention}</span>}
               </NavLink>
             ))}
             <Link to="/settings#account" onClick={() => setMenuOpen(false)}>
