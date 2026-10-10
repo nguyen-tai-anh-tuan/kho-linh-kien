@@ -78,21 +78,16 @@ export function CategoryChip({ name, tone, title }) {
 
 /** Thanh tồn kho: vạch giữa là mức tối thiểu, thanh đầy ở mức gấp đôi tối thiểu */
 export function StockBar({ qty, min, status }) {
-  const pct = min > 0 ? Math.min(100, (qty / (min * 2)) * 100) : 0
+  // Chưa đặt mức tối thiểu: vẫn vẽ thanh cho đồng bộ, đầy khi còn hàng và không có vạch giữa
+  const pct = min > 0 ? Math.min(100, (qty / (min * 2)) * 100) : qty > 0 ? 100 : 0
+  const note = min > 0 ? `Tối thiểu ${fmtNum(min)}` : 'Chưa đặt mức tồn tối thiểu'
   return (
     <div className="kk-stock">
       <span className="kk-stock-num">{fmtNum(qty)}</span>
-      {min > 0 && (
-        <span
-          className="kk-stock-bar"
-          role="img"
-          aria-label={`Tồn ${fmtNum(qty)}, tối thiểu ${fmtNum(min)}`}
-          title={`Tối thiểu ${fmtNum(min)}`}
-        >
-          <i className={`kk-stock-fill kk-fill-${status}`} style={{ width: `${pct}%` }} />
-          <b className="kk-stock-mark" />
-        </span>
-      )}
+      <span className="kk-stock-bar" role="img" aria-label={`Tồn ${fmtNum(qty)}. ${note}`} title={note}>
+        <i className={`kk-stock-fill kk-fill-${status}`} style={{ width: `${pct}%` }} />
+        {min > 0 && <b className="kk-stock-mark" />}
+      </span>
     </div>
   )
 }
