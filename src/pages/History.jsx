@@ -12,7 +12,7 @@ import { downloadCSV } from '../lib/csv'
 import { buildTree, subtreeIds } from '../lib/tree'
 import { fmtDateTime, fmtNum } from '../lib/format'
 
-const PAGE_SIZE = 50
+const PAGE_SIZE = 10
 
 const TYPES = {
   in: { label: 'Nhập', Icon: ArrowDownToLine },
