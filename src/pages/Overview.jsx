@@ -20,6 +20,9 @@ import { EmptyState, Skeleton, TraceLoader } from '../ui/common'
 import { friendlyError } from '../lib/api'
 import { fmtDay, fmtMoney, fmtMoneyFull, fmtNum, greeting, timeAgo } from '../lib/format'
 
+// Hai danh sách ở cuối trang hiện tối đa chừng này dòng, trong một khung cuộn cao cố định
+const RECENT_MAX = 30
+
 export default function Overview() {
   const { components, categories, categoriesById, toneByCategory, loading, refreshing, error, reload, version } = useData()
   const { openTx } = useTx()
@@ -81,7 +84,7 @@ export default function Overview() {
     async function run() {
       const [f, a] = await Promise.all([
         supabase.rpc('daily_flow', { days: 30 }),
-        supabase.from('transactions_feed').select('*').order('created_at', { ascending: false }).limit(8),
+        supabase.from('transactions_feed').select('*').order('created_at', { ascending: false }).limit(RECENT_MAX),
       ])
       if (cancelled) return
       const err = f.error || a.error
@@ -217,8 +220,8 @@ export default function Overview() {
           {toBuy.length === 0 ? (
             <p className="kk-muted-text">Kho đang đủ hàng, chưa có món nào dưới mức tối thiểu.</p>
           ) : (
-            <ul className="kk-list">
-              {toBuy.slice(0, 6).map((c) => (
+            <ul className="kk-list kk-list-scroll">
+              {toBuy.slice(0, RECENT_MAX).map((c) => (
                 <li key={c.id}>
                   <button type="button" className="kk-list-row" onClick={() => openComponent(c.id)}>
                     <span className="kk-list-ico kk-ico-warn">
@@ -254,7 +257,7 @@ export default function Overview() {
               ))}
             </div>
           ) : activity && activity.length > 0 ? (
-            <ul className="kk-list">
+            <ul className="kk-list kk-list-scroll" tabIndex={0} aria-label="Hoạt động gần đây, cuộn để xem thêm">
               {activity.map((t) => (
                 <li key={t.id}>
                   <button type="button" className="kk-list-row" onClick={() => openComponent(t.component_id)}>
@@ -269,6 +272,11 @@ export default function Overview() {
                   </button>
                 </li>
               ))}
+              {activity.length >= RECENT_MAX && (
+                <li className="kk-list-end">
+                  Đang hiện {fmtNum(RECENT_MAX)} giao dịch mới nhất. Các giao dịch cũ hơn nằm trong trang Lịch sử.
+                </li>
+              )}
             </ul>
           ) : (
             <p className="kk-muted-text">

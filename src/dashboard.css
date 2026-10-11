@@ -2904,3 +2904,18 @@ button.kk-mega-name:hover {
   flex: 1 1 280px;
   max-width: 380px;
 }
+
+/* Danh sách ở trang Tổng quan: cao cố định khoảng 6 dòng, dài hơn thì cuộn bên trong thẻ */
+.kk-list-scroll {
+  max-height: 348px;
+  margin-right: -8px;
+  padding-right: 8px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+}
+.kk-list-end {
+  padding: 10px 4px 2px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
