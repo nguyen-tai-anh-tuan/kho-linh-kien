@@ -1,4 +1,4 @@
-import { Cpu, Boxes, MapPin, Bell, Sun, Moon } from 'lucide-react'
+import { Cpu, Boxes, MapPin, Bell, Sun, Moon, FolderKanban } from 'lucide-react'
 import useTheme from './useTheme'
 import './auth.css'
 
@@ -66,6 +66,7 @@ export default function AuthLayout({ children }) {
             <li><Boxes size={18} /> Quản lý linh kiện</li>
             <li><MapPin size={18} /> Vị trí tủ / ngăn</li>
             <li><Bell size={18} /> Cảnh báo tồn kho</li>
+            <li><FolderKanban size={18} /> Quản lý dự án và BOM</li>
           </ul>
         </div>
       </aside>

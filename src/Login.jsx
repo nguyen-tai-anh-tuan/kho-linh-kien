@@ -28,7 +28,6 @@ export default function Login({ linkExpired = false }) {
   const [confirm, setConfirm] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [remember, setRemember] = useState(true)
-  const [keep, setKeep] = useState(false) // giữ đăng nhập cho mọi tab và cả lần mở trình duyệt sau
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(linkExpired ? LINK_EXPIRED : '')
@@ -110,8 +109,8 @@ export default function Login({ linkExpired = false }) {
       return
     }
     saveEmail(remember ? email.trim() : '')
-    // Đổi nơi lưu phiên theo lựa chọn "Giữ đăng nhập" thì phải tải lại trang để áp dụng
-    if (moveSessionTo(keep ? 'shared' : 'tab')) return window.location.reload()
+    // Mỗi tab một phiên riêng. Nếu tab này còn dùng kiểu phiên chung cũ thì chuyển sang rồi tải lại trang.
+    if (moveSessionTo('tab')) return window.location.reload()
     // Đăng nhập xong, App tự chuyển sang Dashboard
   }
 
@@ -284,17 +283,6 @@ export default function Login({ linkExpired = false }) {
           <button type="button" className="link-btn" onClick={() => switchMode('forgot')}>
             Quên mật khẩu?
           </button>
-        </div>
-        <div className="keep-row">
-          <label className="check">
-            <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} />
-            Giữ đăng nhập cho mọi tab
-          </label>
-          <p>
-            {keep
-              ? 'Mọi tab dùng chung tài khoản này và vẫn đăng nhập sau khi đóng trình duyệt. Đăng xuất ở một tab là đăng xuất tất cả.'
-              : 'Chỉ đăng nhập trong tab này. Tab khác có thể dùng tài khoản khác; đóng tab là đăng xuất.'}
-          </p>
         </div>
 
         {messages}
