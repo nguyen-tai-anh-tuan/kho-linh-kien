@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
+import { useBuyList } from '../data/useBuyList'
 import { useTx } from '../TxContext'
 import { useShell } from '../ShellContext'
 import { EmptyState, Skeleton, TraceLoader } from '../ui/common'
@@ -45,10 +46,8 @@ export default function Overview() {
     return { types: components.length, qty, value, hasPrice, attention, out }
   }, [components])
 
-  const toBuy = useMemo(
-    () => components.filter((c) => c.shortage > 0).sort((a, b) => b.shortage - a.shortage),
-    [components],
-  )
+  // Cùng một danh sách với trang Cần mua: hết hàng, dưới mức tối thiểu, hoặc thiếu cho BOM của dự án
+  const { bomByComponent, toBuy, need } = useBuyList()
 
   const slices = useMemo(() => {
     // Gộp theo danh mục lớn: món nằm ở danh mục con hay chi tiết đều tính vào danh mục lớn chứa nó
@@ -218,7 +217,7 @@ export default function Overview() {
             )}
           </div>
           {toBuy.length === 0 ? (
-            <p className="kk-muted-text">Kho đang đủ hàng, chưa có món nào dưới mức tối thiểu.</p>
+            <p className="kk-muted-text">Kho đang đủ hàng: không có món nào hết, dưới mức tối thiểu hoặc thiếu cho dự án.</p>
           ) : (
             <ul className="kk-list kk-list-scroll">
               {toBuy.slice(0, RECENT_MAX).map((c) => (
@@ -230,10 +229,13 @@ export default function Overview() {
                     <span className="kk-list-main">
                       <strong>{c.part_number}</strong>
                       <span className="kk-sub-text">
-                        {c.name}. Còn {fmtNum(c.total_quantity)}, tối thiểu {fmtNum(c.min_stock)}
+                        {c.name}. Còn {fmtNum(c.total_quantity)},{' '}
+                        {bomByComponent.get(c.id)?.short > 0
+                          ? `dự án cần ${fmtNum(bomByComponent.get(c.id).total)}`
+                          : `tối thiểu ${fmtNum(c.min_stock)}`}
                       </span>
                     </span>
-                    <span className="kk-shortage">Thiếu {fmtNum(c.shortage)}</span>
+                    <span className="kk-shortage">Nên mua {fmtNum(need(c))}</span>
                   </button>
                 </li>
               ))}

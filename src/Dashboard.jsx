@@ -24,6 +24,7 @@ import { signOutHere, supabase } from './supabaseClient'
 import useTheme from './useTheme'
 import { APP_VERSION } from './version'
 import { DataProvider, useData } from './data/DataContext'
+import { useBuyList } from './data/useBuyList'
 import { ToastProvider } from './ui/Toast'
 import { TxProvider, useTx } from './TxContext'
 import { ShellContext } from './ShellContext'
@@ -83,14 +84,15 @@ function Shell({ session, profile, reloadProfile }) {
   const [params, setParams] = useSearchParams()
   const location = useLocation()
   const navigate = useNavigate()
-  const { components, refreshing, version } = useData()
+  const { refreshing, version } = useData()
   const { openTx } = useTx()
 
   const openId = params.get('c')
   const onComponents = location.pathname.startsWith('/components')
   const onSheetPage = SHEET_PAGES.some((p) => location.pathname.startsWith(p.to))
   const q = params.get('q') ?? ''
-  const attention = useMemo(() => components.filter((c) => c.status !== 'ok').length, [components])
+  // Đếm đúng số dòng của trang Cần mua. Đổi trang thì tính lại, vì BOM có thể vừa được sửa.
+  const attention = useBuyList(location.pathname).toBuy.length
   const email = session?.user?.email ?? ''
   const displayName = profile.display_name || email
   const mayEdit = canEdit(profile.role)
