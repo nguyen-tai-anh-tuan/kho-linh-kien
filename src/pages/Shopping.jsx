@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { ArrowDownToLine, ClipboardCopy, Download, Search } from 'lucide-react'
 import { useData } from '../data/DataContext'
@@ -7,6 +7,8 @@ import { useShell } from '../ShellContext'
 import { useToast } from '../ui/Toast'
 import { CategoryChip, EmptyState, Skeleton, StatusChip, StockBar } from '../ui/common'
 import { CategoryFilter } from '../ui/CategoryMenu'
+import { supabase } from '../supabaseClient'
+import { fetchAll } from '../lib/api'
 import { downloadCSV } from '../lib/csv'
 import { fmtMoneyFull, fmtNum, fmtPrice, normalize } from '../lib/format'
 import { subtreeIds } from '../lib/tree'
@@ -15,14 +17,19 @@ const KINDS = [
   { key: '', label: 'Tất cả' },
   { key: 'out', label: 'Hết hàng' },
   { key: 'low', label: 'Sắp hết' },
+  { key: 'bom', label: 'Thiếu cho dự án' },
 ]
 
-/** Số lượng nên mua để về lại mức tối thiểu. Hết hàng mà chưa đặt mức tối thiểu thì gợi ý mua ít nhất 1. */
-const needOf = (c) => Math.max(c.shortage ?? 0, 1)
+/**
+ * Số lượng nên mua: đủ để về lại mức tối thiểu VÀ đủ lắp mỗi dự án một bộ (lấy số lớn hơn).
+ * Hết hàng mà không có yêu cầu nào thì gợi ý mua ít nhất 1.
+ */
+const needOf = (c, bom) => Math.max(c.shortage ?? 0, bom?.short ?? 0, 1)
 
 /** Trang "Cần mua": mọi linh kiện đang hết hàng hoặc dưới mức tồn tối thiểu */
 export default function ShoppingPage() {
-  const { components, categoriesById, categoryChildren, toneByCategory, searchText, loading, refreshing, error, reload } = useData()
+  const { components, projects, categoriesById, categoryChildren, toneByCategory, searchText, loading, refreshing, error, reload, version } =
+    useData()
   const { openTx } = useTx()
   const { openComponent, canEdit } = useShell()
   const toast = useToast()
@@ -45,26 +52,61 @@ export default function ShoppingPage() {
     )
   }
 
+  // BOM của mọi dự án, để biết món nào còn thiếu so với nhu cầu lắp ráp
+  const [bomLines, setBomLines] = useState([])
+  useEffect(() => {
+    let off = false
+    fetchAll(() => supabase.from('project_bom').select('id,project_id,component_id,quantity').order('id'))
+      .then((rows) => !off && setBomLines(rows))
+      .catch(() => !off && setBomLines([])) // chưa có bảng BOM thì chỉ tính theo mức tối thiểu
+    return () => {
+      off = true
+    }
+  }, [version])
+
+  // Với mỗi linh kiện: tổng số cần để lắp mỗi dự án một bộ, và còn thiếu bao nhiêu so với tồn kho
+  const bomByComponent = useMemo(() => {
+    const names = new Map(projects.map((p) => [p.id, p.name]))
+    const map = new Map()
+    for (const l of bomLines) {
+      if (!names.has(l.project_id)) continue
+      const item = map.get(l.component_id) ?? { total: 0, uses: [] }
+      item.total += Number(l.quantity) || 0
+      item.uses.push({ name: names.get(l.project_id), quantity: Number(l.quantity) || 0 })
+      map.set(l.component_id, item)
+    }
+    for (const c of components) {
+      const item = map.get(c.id)
+      if (item) item.short = Math.max(0, item.total - c.total_quantity)
+    }
+    return map
+  }, [bomLines, projects, components])
+
+  const bomShort = (c) => bomByComponent.get(c.id)?.short ?? 0
+  const need = (c) => needOf(c, bomByComponent.get(c.id))
+
   // Hết hàng xếp trước, rồi tới món thiếu nhiều nhất
   const toBuy = useMemo(
     () =>
       components
-        .filter((c) => c.status !== 'ok')
+        .filter((c) => c.status !== 'ok' || (bomByComponent.get(c.id)?.short ?? 0) > 0)
         .sort(
           (a, b) =>
             (a.status === 'out' ? 0 : 1) - (b.status === 'out' ? 0 : 1) ||
-            needOf(b) - needOf(a) ||
+            needOf(b, bomByComponent.get(b.id)) - needOf(a, bomByComponent.get(a.id)) ||
             a.part_number.localeCompare(b.part_number, 'vi', { numeric: true }),
         ),
-    [components],
+    [components, bomByComponent],
   )
   const outCount = toBuy.filter((c) => c.status === 'out').length
+  const lowCount = toBuy.filter((c) => c.status === 'low').length
+  const bomCount = toBuy.filter((c) => bomShort(c) > 0).length
 
   const rows = useMemo(() => {
     const terms = normalize(q).split(/\s+/).filter(Boolean)
     const catIds = cat && cat !== 'none' ? new Set(subtreeIds(categoryChildren, cat)) : null
     return toBuy.filter((c) => {
-      if (kind && c.status !== kind) return false
+      if (kind === 'bom' ? !((bomByComponent.get(c.id)?.short ?? 0) > 0) : kind && c.status !== kind) return false
       if (cat === 'none' && c.category_id) return false
       if (catIds && !catIds.has(c.category_id)) return false
       if (terms.length) {
@@ -73,13 +115,13 @@ export default function ShoppingPage() {
       }
       return true
     })
-  }, [toBuy, searchText, categoryChildren, q, kind, cat])
+  }, [toBuy, bomByComponent, searchText, categoryChildren, q, kind, cat])
 
   const priced = rows.filter((c) => Number(c.unit_price) > 0)
-  const cost = priced.reduce((sum, c) => sum + needOf(c) * Number(c.unit_price), 0)
+  const cost = priced.reduce((sum, c) => sum + need(c) * Number(c.unit_price), 0)
 
   function exportCsv() {
-    const header = ['part_number', 'name', 'category', 'package', 'manufacturer', 'total_quantity', 'min_stock', 'need', 'unit_price', 'amount']
+    const header = ['part_number', 'name', 'category', 'package', 'manufacturer', 'total_quantity', 'min_stock', 'project_need', 'need', 'unit_price', 'amount']
     const body = rows.map((c) => [
       c.part_number,
       c.name,
@@ -88,15 +130,16 @@ export default function ShoppingPage() {
       c.manufacturer,
       c.total_quantity,
       c.min_stock,
-      needOf(c),
+      bomByComponent.get(c.id)?.total ?? 0,
+      need(c),
       c.unit_price,
-      Number(c.unit_price) > 0 ? needOf(c) * Number(c.unit_price) : '',
+      Number(c.unit_price) > 0 ? need(c) * Number(c.unit_price) : '',
     ])
     downloadCSV(`can-mua-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...body])
   }
 
   async function copyList() {
-    const text = rows.map((c) => `${c.part_number} x ${needOf(c)}${c.package ? ` (${c.package})` : ''}`).join('\n')
+    const text = rows.map((c) => `${c.part_number} x ${need(c)}${c.package ? ` (${c.package})` : ''}`).join('\n')
     try {
       await navigator.clipboard.writeText(text)
       toast.push({ message: `Đã chép ${fmtNum(rows.length)} dòng. Dán vào tin nhắn hoặc ô tìm kiếm của nơi bán.` })
@@ -125,7 +168,7 @@ export default function ShoppingPage() {
               ? 'Đang tải…'
               : toBuy.length === 0
                 ? 'Kho đang đủ hàng.'
-                : `${fmtNum(toBuy.length)} mã cần mua: ${fmtNum(outCount)} hết hàng, ${fmtNum(toBuy.length - outCount)} sắp hết`}
+                : `${fmtNum(toBuy.length)} mã cần mua: ${fmtNum(outCount)} hết hàng, ${fmtNum(lowCount)} sắp hết, ${fmtNum(bomCount)} thiếu cho dự án`}
           </p>
         </div>
         <div className="kk-quick">
@@ -182,7 +225,7 @@ export default function ShoppingPage() {
         ) : toBuy.length === 0 ? (
           <EmptyState
             title="Chưa có gì cần mua"
-            text="Không có linh kiện nào hết hàng hoặc dưới mức tồn tối thiểu. Đặt mức tồn tối thiểu cho linh kiện để được nhắc khi sắp hết."
+            text="Không có linh kiện nào hết hàng, dưới mức tồn tối thiểu hoặc thiếu so với BOM của các dự án."
           />
         ) : rows.length === 0 ? (
           <EmptyState title="Không có linh kiện nào khớp" text="Thử đổi từ khóa hoặc bỏ bớt bộ lọc.">
@@ -208,7 +251,9 @@ export default function ShoppingPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((c) => (
+                  {rows.map((c) => {
+                    const bom = bomByComponent.get(c.id)
+                    return (
                     <tr key={c.id} onClick={() => openComponent(c.id)}>
                       <td data-label="Linh kiện" className="kk-cell-main">
                         <button
@@ -229,6 +274,11 @@ export default function ShoppingPage() {
                             title={categoriesById.get(c.category_id)?.path}
                           />
                         </span>
+                        {bom?.short > 0 && (
+                          <span className="kk-buy-why">
+                            Dự án cần {fmtNum(bom.total)}: {bom.uses.map((u) => `${u.name} (${fmtNum(u.quantity)})`).join(', ')}
+                          </span>
+                        )}
                       </td>
                       <td data-label="Package" className="kk-col-pkg">
                         {c.package || '—'}
@@ -240,15 +290,24 @@ export default function ShoppingPage() {
                         {c.min_stock > 0 ? fmtNum(c.min_stock) : '—'}
                       </td>
                       <td data-label="Nên mua" className="is-num">
-                        <span className="kk-shortage" title={c.min_stock > 0 ? 'Số lượng để về lại mức tối thiểu' : 'Chưa đặt mức tối thiểu, gợi ý mua ít nhất 1'}>
-                          {fmtNum(needOf(c))}
+                        <span
+                          className="kk-shortage"
+                          title={
+                            bom?.short > 0 && bom.short >= (c.shortage ?? 0)
+                              ? `Dự án cần ${fmtNum(bom.total)}, kho có ${fmtNum(c.total_quantity)}`
+                              : c.shortage > 0
+                                ? 'Số lượng để về lại mức tối thiểu'
+                                : 'Gợi ý mua ít nhất 1'
+                          }
+                        >
+                          {fmtNum(need(c))}
                         </span>
                       </td>
                       <td data-label="Đơn giá" className="kk-col-price is-num">
                         {fmtPrice(c.unit_price)}
                       </td>
                       <td data-label="Thành tiền" className="kk-col-price is-num">
-                        {Number(c.unit_price) > 0 ? fmtMoneyFull(needOf(c) * Number(c.unit_price)) : '—'}
+                        {Number(c.unit_price) > 0 ? fmtMoneyFull(need(c) * Number(c.unit_price)) : '—'}
                       </td>
                       <td data-label="Trạng thái">
                         <StatusChip status={c.status} />
@@ -267,7 +326,8 @@ export default function ShoppingPage() {
                         </td>
                       )}
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

@@ -3058,3 +3058,9 @@ button.kk-mega-name:hover {
     display: none;
   }
 }
+.kk-buy-why {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.78rem;
+  color: var(--kk-warn);
+}
