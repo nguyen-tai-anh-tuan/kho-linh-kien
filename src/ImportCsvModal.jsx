@@ -49,8 +49,9 @@ export function analyzeCsv(text, existingComponents) {
       duplicates++
       return
     }
-    const min = get('min_stock') === '' ? 0 : parseNumber(get('min_stock'))
-    if (!Number.isInteger(min) || min < 0) {
+    // Để trống cột này thì linh kiện theo mức cảnh báo mặc định
+    const min = get('min_stock') === '' ? null : parseNumber(get('min_stock'))
+    if (min !== null && (!Number.isInteger(min) || min < 0)) {
       errors.push(`Dòng ${line}: tồn tối thiểu "${get('min_stock')}" không hợp lệ.`)
       return
     }
@@ -105,7 +106,7 @@ const pathKey = (text) =>
 const chunk = (arr, n) => Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n))
 
 export default function ImportCsvModal({ onClose }) {
-  const { allComponents: components, categories, categoryChildren, categoryTree, locations, reload } = useData()
+  const { allComponents: components, categories, categoryChildren, categoryTree, locations, levels, reload } = useData()
   const toast = useToast()
   const inputRef = useRef(null)
   const [fileName, setFileName] = useState('')
@@ -222,7 +223,7 @@ export default function ImportCsvModal({ onClose }) {
               value: it.value || null,
               package: it.package || null,
               manufacturer: it.manufacturer || null,
-              min_stock: it.min_stock,
+              min_stock: it.min_stock ?? (levels.ready ? null : 0),
               unit_price: it.unit_price,
               datasheet_url: it.datasheet_url || null,
               notes: it.notes || null,

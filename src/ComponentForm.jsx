@@ -13,7 +13,7 @@ const text = (v) => (v === null || v === undefined ? '' : String(v))
 
 /** Form thêm mới (initial = null) hoặc sửa linh kiện (initial = dòng từ component_totals) */
 export default function ComponentForm({ initial, onClose, onSaved }) {
-  const { allComponents: components, locations, createLocation, reload } = useData()
+  const { allComponents: components, locations, levels, levelFor, createLocation, reload } = useData()
   const toast = useToast()
   const editing = Boolean(initial)
 
@@ -24,7 +24,8 @@ export default function ComponentForm({ initial, onClose, onSaved }) {
     value: text(initial?.value),
     package: text(initial?.package),
     manufacturer: text(initial?.manufacturer),
-    min_stock: text(initial?.min_stock ?? 0),
+    // Có mức chung thì để trống = theo mặc định; database cũ thì vẫn là một con số
+    min_stock: levels.ready ? text(initial?.min_stock_own) : text(initial?.min_stock ?? 0),
     unit_price: text(initial?.unit_price),
     datasheet_url: text(initial?.datasheet_url),
     image_url: text(initial?.image_url),
@@ -41,6 +42,10 @@ export default function ComponentForm({ initial, onClose, onSaved }) {
   const duplicate =
     f.part_number.trim() !== '' &&
     components.some((c) => c.id !== initial?.id && normalize(c.part_number) === normalize(f.part_number))
+
+  // Mức mà linh kiện sẽ nhận nếu để trống ô "Tồn tối thiểu"
+  const inherited = levelFor(f.category_id)
+  const defaultHint = `Để trống thì theo ${inherited.category ? `danh mục ${inherited.category.name}` : 'mức chung'}: báo sắp hết khi tồn dưới ${inherited.value}.`
 
   function validate() {
     const e = {}
@@ -73,7 +78,7 @@ export default function ComponentForm({ initial, onClose, onSaved }) {
       value: f.value.trim() || null,
       package: f.package.trim() || null,
       manufacturer: f.manufacturer.trim() || null,
-      min_stock: f.min_stock === '' ? 0 : parseNumber(f.min_stock),
+      min_stock: f.min_stock === '' ? (levels.ready ? null : 0) : parseNumber(f.min_stock),
       unit_price: f.unit_price.trim() === '' ? null : parseNumber(f.unit_price),
       datasheet_url: f.datasheet_url.trim() || null,
       image_url: f.image_url.trim() || null,
@@ -174,8 +179,19 @@ export default function ComponentForm({ initial, onClose, onSaved }) {
           <input id="cf-mfr" value={f.manufacturer} onChange={set('manufacturer')} />
         </Field>
 
-        <Field label="Tồn tối thiểu" htmlFor="cf-min" error={errors.min_stock} hint="Dưới mức này sẽ báo sắp hết.">
-          <input id="cf-min" inputMode="numeric" value={f.min_stock} onChange={set('min_stock')} />
+        <Field
+          label={levels.ready ? 'Tồn tối thiểu (mức riêng)' : 'Tồn tối thiểu'}
+          htmlFor="cf-min"
+          error={errors.min_stock}
+          hint={levels.ready ? defaultHint : 'Dưới mức này sẽ báo sắp hết.'}
+        >
+          <input
+            id="cf-min"
+            inputMode="numeric"
+            value={f.min_stock}
+            placeholder={levels.ready ? `Theo mặc định: ${inherited.value}` : undefined}
+            onChange={set('min_stock')}
+          />
         </Field>
         <Field label="Đơn giá (đ)" htmlFor="cf-price" error={errors.unit_price} hint="Dùng để tính giá trị kho.">
           <input id="cf-price" inputMode="decimal" value={f.unit_price} onChange={set('unit_price')} />

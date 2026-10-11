@@ -28,6 +28,16 @@ async function loadCategories() {
   }
 }
 
+/** Mức cảnh báo chung và theo danh mục. Chưa chạy sql/08_warning_levels.sql thì ready = false. */
+async function loadLevels() {
+  const [general, byCategory] = await Promise.all([
+    supabase.from('settings').select('default_min_stock').maybeSingle(),
+    supabase.from('categories').select('id,min_stock').not('min_stock', 'is', null),
+  ])
+  if (general.error || byCategory.error || !general.data) return { ready: false, defaultMin: 0, rows: [] }
+  return { ready: true, defaultMin: general.data.default_min_stock, rows: byCategory.data }
+}
+
 export function DataProvider({ children }) {
   const [raw, setRaw] = useState({
     components: [],
@@ -35,6 +45,7 @@ export function DataProvider({ children }) {
     categories: [],
     locations: [],
     projects: [],
+    levels: { ready: false, defaultMin: 0, rows: [] },
   })
   const [status, setStatus] = useState({ loading: true, refreshing: false, error: null })
   const [version, setVersion] = useState(0)
@@ -48,7 +59,7 @@ export function DataProvider({ children }) {
         if (res.error) throw res.error
         return res.data
       }
-      const [components, stock, categories, locations, projects] = await Promise.all([
+      const [components, stock, categories, locations, projects, levels] = await Promise.all([
         fetchAll(() => supabase.from('component_totals').select('*').order('id')),
         fetchAll(() =>
           supabase
@@ -64,10 +75,11 @@ export function DataProvider({ children }) {
           .order('path')
           .then(must),
         supabase.from('projects').select('id,name,description').order('name').then(must),
+        loadLevels(),
       ])
       if (!alive.current) return
       setCategoryTree(categories.tree)
-      setRaw({ components, stock, categories: categories.rows, locations, projects })
+      setRaw({ components, stock, categories: categories.rows, locations, projects, levels })
       setVersion((v) => v + 1)
       setStatus({ loading: false, refreshing: false, error: null })
     } catch (error) {
@@ -112,6 +124,20 @@ export function DataProvider({ children }) {
     const rootTone = new Map((categoryChildren.get(null) ?? []).map((c, i) => [c.id, i % 6]))
     const toneByCategory = new Map(categories.map((c) => [c.id, rootTone.get(c.root_id) ?? 0]))
 
+    // Mức cảnh báo: mức riêng của linh kiện -> danh mục gần nhất có đặt mức -> mức chung
+    const levels = {
+      ready: raw.levels.ready,
+      defaultMin: raw.levels.defaultMin,
+      byCategory: new Map(raw.levels.rows.map((r) => [r.id, r.min_stock])),
+    }
+    /** Mức mà một linh kiện thuộc danh mục này sẽ nhận nếu không đặt mức riêng */
+    const levelFor = (categoryId) => {
+      for (let c = categoriesById.get(categoryId); c; c = categoriesById.get(c.parent_id)) {
+        if (levels.byCategory.has(c.id)) return { value: levels.byCategory.get(c.id), category: c }
+      }
+      return { value: levels.defaultMin, category: null }
+    }
+
     // Linh kiện ngừng dùng bị ẩn khỏi danh sách, thống kê và các ô chọn, nhưng lịch sử vẫn tra được qua componentsById
     const components = raw.components.filter((c) => !c.archived_at)
     const archivedComponents = raw.components.filter((c) => c.archived_at)
@@ -136,6 +162,8 @@ export function DataProvider({ children }) {
       components,
       archivedComponents,
       allComponents: raw.components,
+      levels,
+      levelFor,
       locationsById,
       componentsById,
       stockMap,

@@ -254,7 +254,18 @@ export default function ComponentDrawer({ id, onClose }) {
           </div>
           <div>
             <dt>Tồn tối thiểu</dt>
-            <dd>{fmtNum(c.min_stock)}</dd>
+            <dd>
+              {fmtNum(c.min_stock)}
+              {c.min_source && (
+                <small className="kk-dd-note">
+                  {c.min_source === 'own'
+                    ? 'mức riêng'
+                    : c.min_source === 'category'
+                      ? `theo danh mục ${categoriesById.get(c.min_category_id)?.name ?? ''}`
+                      : 'theo mức chung'}
+                </small>
+              )}
+            </dd>
           </div>
           <div>
             <dt>Đơn giá</dt>
