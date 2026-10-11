@@ -5,10 +5,10 @@ import { useData } from '../data/DataContext'
 import { useShell } from '../ShellContext'
 import { useToast } from '../ui/Toast'
 import { ConfirmDialog } from '../ui/dialogs'
-import { Field, QtyStepper, Skeleton } from '../ui/common'
+import { CategoryPicker, Field, QtyStepper, Skeleton } from '../ui/common'
 import { friendlyError, mustChange } from '../lib/api'
 import { fmtNum } from '../lib/format'
-import { indentLabel, subtreeIds } from '../lib/tree'
+import { subtreeIds } from '../lib/tree'
 
 const MAX_OWN = 12
 const validLevel = (v) => v !== '' && Number.isInteger(Number(v)) && Number(v) >= 0
@@ -29,7 +29,6 @@ export default function SettingsLevels() {
   const [dialog, setDialog] = useState(null) // { kind: 'reset' } | { kind: 'clear', category }
 
   const withLevel = categories.filter((c) => levels.byCategory.has(c.id))
-  const withoutLevel = categories.filter((c) => !levels.byCategory.has(c.id))
   const own = allComponents.filter((c) => c.min_stock_own !== null && c.min_stock_own !== undefined)
   const generalValue = general ?? levels.defaultMin
   const generalChanged = validLevel(generalValue) && Number(generalValue) !== levels.defaultMin
@@ -180,17 +179,16 @@ export default function SettingsLevels() {
             </ul>
           )}
 
-          {isAdmin && withoutLevel.length > 0 && (
+          {isAdmin && categories.length > 0 && (
             <div className="kk-bulk-form kk-level-add">
-              <Field label="Danh mục" htmlFor="lv-cat" hint="Áp dụng cho cả các danh mục nằm bên trong nó.">
-                <select id="lv-cat" value={target} onChange={(e) => setTarget(e.target.value)}>
-                  <option value="">Chọn danh mục</option>
-                  {withoutLevel.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {indentLabel(c)}
-                    </option>
-                  ))}
-                </select>
+              <Field label="Danh mục" htmlFor="lv-cat" hint={target && levels.byCategory.has(target) ? `Danh mục này đang có mức ${fmtNum(levels.byCategory.get(target))}, đặt lại sẽ thay mức đó.` : 'Áp dụng cho cả các danh mục nằm bên trong nó.'}>
+                <CategoryPicker
+                  id="lv-cat"
+                  value={target || null}
+                  allowNone={false}
+                  placeholder="Bấm để chọn hoặc gõ để tìm danh mục…"
+                  onChange={(id) => setTarget(id ?? '')}
+                />
               </Field>
               <Field label="Mức cảnh báo" htmlFor="lv-level" hint={target ? `Danh mục này đang có ${fmtNum(insideCount(target))} linh kiện.` : ' '}>
                 <QtyStepper id="lv-level" value={level} min={0} label="Mức cảnh báo của danh mục" onChange={setLevel} />

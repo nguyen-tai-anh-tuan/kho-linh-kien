@@ -257,7 +257,7 @@ export function QtyStepper({ value, onChange, min = 0, id, label = 'Số lượn
 /* ------------------------------------------------------------------ */
 /* Ô tìm và chọn danh mục: hiện đường dẫn đầy đủ "Lớn › Con › Chi tiết" */
 /* ------------------------------------------------------------------ */
-export function CategoryPicker({ id, value, onChange }) {
+export function CategoryPicker({ id, value, onChange, placeholder = 'Chưa phân loại. Bấm để chọn hoặc gõ để tìm…', allowNone = true }) {
   const { categories, categoriesById } = useData()
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
@@ -274,8 +274,8 @@ export function CategoryPicker({ id, value, onChange }) {
           return terms.every((t) => text.includes(t))
         })
       : categories
-    return [null, ...list]
-  }, [q, categories])
+    return allowNone ? [null, ...list] : list
+  }, [q, categories, allowNone])
 
   function pick(c) {
     onChange(c ? c.id : null)
@@ -321,12 +321,12 @@ export function CategoryPicker({ id, value, onChange }) {
         aria-activedescendant={open && q && results[hi] !== undefined ? `${listId}-${hi}` : undefined}
         autoComplete="off"
         autoFocus={open}
-        placeholder="Chưa phân loại. Bấm để chọn hoặc gõ để tìm…"
+        placeholder={placeholder}
         value={q}
         onChange={(e) => {
           setQ(e.target.value)
           setOpen(true)
-          setHi(e.target.value ? 1 : 0)
+          setHi(e.target.value && allowNone ? 1 : 0)
         }}
         onFocus={() => setOpen(true)}
         onClick={() => setOpen(true)}
@@ -377,7 +377,7 @@ export function CategoryPicker({ id, value, onChange }) {
               )}
             </li>
           ))}
-          {results.length === 1 && q && <li className="kk-combo-empty">Không có danh mục nào khớp. Bạn có thể thêm danh mục mới trong trang Cài đặt.</li>}
+          {results.length === (allowNone ? 1 : 0) && q && <li className="kk-combo-empty">Không có danh mục nào khớp. Bạn có thể thêm danh mục mới trong trang Cài đặt.</li>}
         </ul>
       )}
     </div>

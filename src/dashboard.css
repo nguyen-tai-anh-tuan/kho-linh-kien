@@ -2896,3 +2896,11 @@ button.kk-mega-name:hover {
   font-weight: 500;
   color: var(--muted);
 }
+.kk-level-add {
+  /* Menu chọn danh mục rộng hơn ô nhập để đủ chỗ cho hai cột */
+  --kk-combo-wide: min(720px, calc(100vw - 72px));
+}
+.kk-level-add > .kk-field:first-child {
+  flex: 1 1 280px;
+  max-width: 380px;
+}
