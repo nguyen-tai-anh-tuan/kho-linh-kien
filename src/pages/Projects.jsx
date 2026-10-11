@@ -10,7 +10,7 @@ import { Modal } from '../ui/Modal'
 import { ConfirmDialog } from '../ui/dialogs'
 import { ComponentPicker, EmptyState, Field, QtyStepper, Skeleton } from '../ui/common'
 import { friendlyError, isMissingSchema, mustChange } from '../lib/api'
-import { fetchBomLines } from '../lib/bom'
+import { fetchBomLines, returnToStock } from '../lib/bom'
 import { downloadCSV } from '../lib/csv'
 import { fmtNum, normalize } from '../lib/format'
 import { removeProjectFiles } from '../lib/images'
@@ -217,7 +217,13 @@ export default function ProjectsPage() {
         <ProjectForm initial={dialog.project} onSaved={select} onClose={() => setDialog(null)} />
       )}
       {dialog?.kind === 'delete' && (
-        <DeleteProject project={dialog.project} afterDelete={() => select(null)} onClose={() => setDialog(null)} />
+        <DeleteProject
+          project={dialog.project}
+          lines={linesByProject.get(dialog.project.id) ?? []}
+          tracked={tracked}
+          afterDelete={() => select(null)}
+          onClose={() => setDialog(null)}
+        />
       )}
     </div>
   )
@@ -227,9 +233,10 @@ export default function ProjectsPage() {
 /* Chi tiết một dự án: bảng BOM, tình trạng đủ/thiếu, xuất kho         */
 /* ------------------------------------------------------------------ */
 function ProjectDetail({ project, lines, images, tracked, setBom, refetchBom, onEdit, onDelete }) {
-  const { componentsById } = useData()
+  const { componentsById, stockByComponent, locations, locationsById, reload } = useData()
   const { openComponent, canEdit, isAdmin } = useShell()
   const toast = useToast()
+  const undo = useUndoTx()
   const [builds, setBuilds] = useState(1)
   const [addId, setAddId] = useState(null)
   const [addQty, setAddQty] = useState(1)
@@ -278,6 +285,54 @@ function ProjectDetail({ project, lines, images, tracked, setBom, refetchBom, on
     setAddQty(1)
   }
 
+  /**
+   * Trả linh kiện đã xuất cho dự án về kho (về đúng các vị trí đã lấy ra), rồi báo kèm nút Hoàn tác.
+   * restore() được gọi khi người dùng hoàn tác, để đưa dòng BOM về như trước.
+   */
+  async function giveBack(comp, quantity, reason, restore) {
+    const fallback = stockByComponent.get(comp.id)?.[0]?.location_id ?? locations[0]?.id
+    let done = null
+    try {
+      done = await returnToStock({
+        projectId: project.id,
+        componentId: comp.id,
+        quantity,
+        note: `Trả lại kho: ${reason}${project.code ? ` (${project.code})` : ''}`,
+        fallbackLocationId: fallback,
+      })
+    } catch (e) {
+      toast.push({
+        tone: 'error',
+        duration: 12000,
+        message: `Chưa trả được ${fmtNum(quantity)} × ${comp.part_number} về kho. ${friendlyError(e)} Bạn hãy nhập kho lại số này bằng tay.`,
+      })
+      return false
+    }
+    if (!done) {
+      toast.push({
+        tone: 'error',
+        duration: 12000,
+        message: `Kho chưa có vị trí nào để trả ${fmtNum(quantity)} × ${comp.part_number} về. Bạn hãy nhập kho lại số này bằng tay.`,
+      })
+      return false
+    }
+    await reload()
+    const where = [...new Set(done.map((t) => locationsById.get(t.location_id)?.path).filter(Boolean))].join(', ')
+    toast.push({
+      duration: 10000,
+      message: `Đã trả ${fmtNum(quantity)} × ${comp.part_number} về kho${where ? ` (${where})` : ''}.`,
+      action: {
+        label: 'Hoàn tác',
+        onClick: async () => {
+          if (!(await undo(done))) return
+          await restore()
+          refetchBom()
+        },
+      },
+    })
+    return true
+  }
+
   function changeQty(line, qty) {
     // Cập nhật ngay trên màn hình, đợi người dùng dừng bấm rồi mới lưu
     setBom((list) => (Array.isArray(list) ? list.map((l) => (l.id === line.id ? { ...l, quantity: qty } : l)) : list))
@@ -290,8 +345,19 @@ function ProjectDetail({ project, lines, images, tracked, setBom, refetchBom, on
           mustChange(await supabase.from('project_bom').update({ quantity: Number(qty) }).eq('id', line.id).select('id'))
         } catch (e) {
           toast.push({ tone: 'error', message: `Chưa lưu được số lượng. ${friendlyError(e)}`, duration: 9000 })
-          refetchBom()
+          return refetchBom()
         }
+        // Giảm số lượng xuống dưới mức đã xuất: phần xuất dư được trả về kho
+        const issued = Number(line.issued) || 0
+        const keep = Number(qty) * n
+        const comp = componentsById.get(line.component_id)
+        if (!tracked || !comp || issued <= keep) return
+        const { error } = await supabase.from('project_bom').update({ issued: keep }).eq('id', line.id)
+        if (error) return toast.push({ tone: 'error', message: friendlyError(error), duration: 9000 })
+        setBom((list) => (Array.isArray(list) ? list.map((l) => (l.id === line.id ? { ...l, issued: keep } : l)) : list))
+        await giveBack(comp, issued - keep, 'giảm số lượng trong BOM', async () => {
+          await supabase.from('project_bom').update({ issued }).eq('id', line.id)
+        })
       }, 500),
     )
   }
@@ -304,20 +370,28 @@ function ProjectDetail({ project, lines, images, tracked, setBom, refetchBom, on
       return toast.push({ tone: 'error', message: friendlyError(e), duration: 9000 })
     }
     setBom((list) => (Array.isArray(list) ? list.filter((l) => l.id !== row.line.id) : list))
+
+    const putBack = async () => {
+      const { error } = await supabase.from('project_bom').insert({
+        project_id: project.id,
+        component_id: row.line.component_id,
+        quantity: row.line.quantity,
+        ...(tracked ? { issued: row.line.issued ?? 0 } : {}),
+      })
+      if (error) toast.push({ tone: 'error', message: `Không đưa lại được vào BOM. ${friendlyError(error)}`, duration: 9000 })
+    }
+
+    // Linh kiện đã xuất kho cho dự án mà nay bỏ khỏi BOM: trả số đã xuất về kho
+    if (tracked && row.issued > 0) {
+      const ok = await giveBack(row.comp, row.issued, 'bỏ khỏi BOM', putBack)
+      if (ok) return
+    }
     toast.push({
       message: `Đã bỏ ${row.comp.part_number} khỏi BOM.`,
       action: {
         label: 'Hoàn tác',
         onClick: async () => {
-          const { error } = await supabase
-            .from('project_bom')
-            .insert({
-              project_id: project.id,
-              component_id: row.line.component_id,
-              quantity: row.line.quantity,
-              ...(tracked ? { issued: row.line.issued ?? 0 } : {}),
-            })
-          if (error) toast.push({ tone: 'error', message: `Không hoàn tác được. ${friendlyError(error)}`, duration: 9000 })
+          await putBack()
           refetchBom()
         },
       },
@@ -502,7 +576,7 @@ function ProjectDetail({ project, lines, images, tracked, setBom, refetchBom, on
                         type="button"
                         className="kk-icon-btn"
                         aria-label={`Bỏ ${r.comp.part_number} khỏi BOM`}
-                        title="Bỏ khỏi BOM"
+                        title={tracked && r.issued > 0 ? `Bỏ khỏi BOM và trả ${fmtNum(r.issued)} cái đã xuất về kho` : 'Bỏ khỏi BOM'}
                         onClick={() => removeLine(r)}
                       >
                         <Trash2 size={16} />
@@ -854,24 +928,134 @@ function ProjectForm({ initial, onSaved, onClose }) {
   )
 }
 
-function DeleteProject({ project, afterDelete, onClose }) {
-  const { reload } = useData()
+/**
+ * Xóa dự án = dự án đã hủy, không thực hiện nữa. Linh kiện đã xuất kho cho dự án được trả về kho
+ * trước khi xóa. Người dùng phải tick xác nhận thì mới bấm xóa được.
+ */
+function DeleteProject({ project, lines, tracked, afterDelete, onClose }) {
+  const { componentsById, stockByComponent, locations, reload } = useData()
   const toast = useToast()
+  const [sure, setSure] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  // Các dòng BOM đã xuất kho, cần trả về
+  const issued = tracked
+    ? lines
+        .map((l) => ({ line: l, comp: componentsById.get(l.component_id), qty: Number(l.issued) || 0 }))
+        .filter((x) => x.comp && x.qty > 0)
+    : []
+  const totalQty = issued.reduce((sum, x) => sum + x.qty, 0)
+  const label = project.code ? `${project.code} ${project.name}` : project.name
+
+  async function run() {
+    if (busy || !sure) return
+    setBusy(true)
+    setError('')
+    try {
+      for (const x of issued) {
+        const done = await returnToStock({
+          projectId: project.id,
+          componentId: x.comp.id,
+          quantity: x.qty,
+          note: `Trả lại kho: hủy dự án ${label}`.slice(0, 200),
+          fallbackLocationId: stockByComponent.get(x.comp.id)?.[0]?.location_id ?? locations[0]?.id,
+        })
+        if (!done) throw new Error(`Kho chưa có vị trí nào để trả ${x.comp.part_number} về. Hãy tạo một vị trí rồi thử lại.`)
+        // Ghi nhận ngay là đã trả, để nếu bước sau lỗi rồi bấm lại thì không trả hai lần
+        await supabase.from('project_bom').update({ issued: 0 }).eq('id', x.line.id)
+      }
+      // Dọn file ảnh trước, vì xóa dự án xong thì không còn biết ảnh nào của nó
+      await removeProjectFiles(project.id)
+      mustChange(await supabase.from('projects').delete().eq('id', project.id).select('id'))
+      afterDelete()
+      await reload()
+      toast.push({
+        duration: 9000,
+        message:
+          issued.length > 0
+            ? `Đã xóa dự án ${project.name} và trả ${fmtNum(totalQty)} linh kiện (${fmtNum(issued.length)} mã) về kho.`
+            : `Đã xóa dự án ${project.name}.`,
+      })
+      onClose()
+    } catch (e) {
+      // Có thể đã trả được một phần: tải lại để tồn kho và cột Đã xuất hiện đúng
+      await reload()
+      setError(e instanceof Error && !e.code ? e.message.replace('NO_ROWS_CHANGED', friendlyError(e)) : friendlyError(e))
+      setBusy(false)
+    }
+  }
+
   return (
-    <ConfirmDialog
+    <Modal
       title={`Xóa dự án ${project.name}?`}
-      text="Danh sách BOM và các ảnh của dự án cũng bị xóa theo. Việc này không hoàn tác được."
-      confirmLabel="Xóa dự án"
-      Icon={Trash2}
-      onConfirm={async () => {
-        // Dọn file ảnh trước, vì xóa dự án xong thì không còn biết ảnh nào của nó
-        await removeProjectFiles(project.id)
-        mustChange(await supabase.from('projects').delete().eq('id', project.id).select('id'))
-        afterDelete()
-        await reload()
-        toast.push({ message: `Đã xóa dự án ${project.name}.` })
-      }}
+      subtitle={project.code || undefined}
       onClose={onClose}
-    />
+      footer={
+        <>
+          <button type="button" className="kk-btn kk-btn-ghost" data-autofocus onClick={onClose} disabled={busy}>
+            Giữ lại
+          </button>
+          <button type="button" className="kk-btn kk-btn-danger" onClick={run} disabled={busy || !sure}>
+            {busy ? <Loader2 size={18} className="kk-spin" /> : <Trash2 size={18} />}
+            {busy ? 'Đang xóa…' : issued.length > 0 ? 'Trả hàng về kho và xóa dự án' : 'Xóa dự án'}
+          </button>
+        </>
+      }
+    >
+      <p className="kk-confirm-text">
+        Xóa dự án nghĩa là dự án này đã hủy và không thực hiện nữa. Danh sách BOM và các ảnh của dự án bị xóa theo. Việc này không
+        hoàn tác được.
+      </p>
+
+      {issued.length > 0 ? (
+        <>
+          <h3 className="kk-sub">
+            Sẽ trả về kho {fmtNum(totalQty)} linh kiện ({fmtNum(issued.length)} mã)
+          </h3>
+          <table className="kk-mini-table">
+            <thead>
+              <tr>
+                <th>Linh kiện đã xuất cho dự án</th>
+                <th className="is-num">Trả về kho</th>
+              </tr>
+            </thead>
+            <tbody>
+              {issued.map((x) => (
+                <tr key={x.line.id}>
+                  <td>
+                    <strong>{x.comp.part_number}</strong>
+                  </td>
+                  <td className="is-num">{fmtNum(x.qty)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="kk-muted-text kk-bom-skipped">
+            Hàng được nhập lại vào đúng các vị trí đã lấy ra và được ghi trong Lịch sử. Nếu linh kiện đã hàn lên mạch và không thu
+            lại được, hãy bấm "Bắt đầu đợt mới" trong dự án trước khi xóa để không trả về kho.
+          </p>
+        </>
+      ) : (
+        <p className="kk-muted-text kk-bom-skipped">
+          {lines.length > 0
+            ? 'Dự án này chưa xuất kho linh kiện nào theo BOM, nên tồn kho không thay đổi.'
+            : 'Dự án này chưa có BOM, nên tồn kho không thay đổi.'}
+        </p>
+      )}
+
+      <label className="kk-check-confirm">
+        <input type="checkbox" checked={sure} disabled={busy} onChange={(e) => setSure(e.target.checked)} />
+        <span>
+          Tôi xác nhận dự án <strong>{label}</strong> đã hủy và không thực hiện nữa.
+        </span>
+      </label>
+
+      {error && (
+        <p className="kk-form-error" role="alert">
+          {error}
+        </p>
+      )}
+    </Modal>
   )
 }

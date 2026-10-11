@@ -3107,3 +3107,25 @@ a.kk-prj:hover {
   margin-bottom: 10px;
   font-size: 0.86rem;
 }
+
+/* Ô tick xác nhận trước khi làm việc không hoàn tác được */
+.kk-check-confirm {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--kk-warn-line);
+  border-radius: 12px;
+  background: var(--kk-warn-bg);
+  color: var(--kk-warn);
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+.kk-check-confirm input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--primary);
+}
