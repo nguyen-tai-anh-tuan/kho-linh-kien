@@ -3102,3 +3102,8 @@ a.kk-prj:hover {
   font-size: 0.76rem;
   color: var(--muted);
 }
+
+.kk-bom-skipped {
+  margin-bottom: 10px;
+  font-size: 0.86rem;
+}

@@ -30,9 +30,13 @@ export function useUndoTx() {
         note: 'Hoàn tác giao dịch trước',
       }))
       const { error: err } = await supabase.from('transactions').insert(inverse)
-      if (err) return toast.push({ tone: 'error', message: `Không hoàn tác được. ${friendlyError(err)}`, duration: 9000 })
+      if (err) {
+        toast.push({ tone: 'error', message: `Không hoàn tác được. ${friendlyError(err)}`, duration: 9000 })
+        return false
+      }
       await reload()
       toast.push({ message: 'Đã hoàn tác giao dịch.' })
+      return true
     },
     [reload, toast],
   )

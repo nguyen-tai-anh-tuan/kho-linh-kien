@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { AlertTriangle, ArrowUpFromLine, CheckCircle2, ChevronLeft, ChevronRight, CircuitBoard, Download, Loader2, Pencil, Plus, Save, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowUpFromLine, CheckCircle2, ChevronLeft, ChevronRight, CircuitBoard, Download, RotateCcw, Loader2, Pencil, Plus, Save, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
 import { useUndoTx } from '../TxContext'
@@ -9,16 +9,19 @@ import { useToast } from '../ui/Toast'
 import { Modal } from '../ui/Modal'
 import { ConfirmDialog } from '../ui/dialogs'
 import { ComponentPicker, EmptyState, Field, QtyStepper, Skeleton } from '../ui/common'
-import { fetchAll, friendlyError, isMissingSchema, mustChange } from '../lib/api'
+import { friendlyError, isMissingSchema, mustChange } from '../lib/api'
+import { fetchBomLines } from '../lib/bom'
 import { downloadCSV } from '../lib/csv'
 import { fmtNum, normalize } from '../lib/format'
 import { removeProjectFiles } from '../lib/images'
 import { ProjectGallery, useProjectImages } from './ProjectImages'
 
-const BOM_COLUMNS = 'id,project_id,component_id,quantity'
 const BOM_PAGE = 10 // số dòng BOM trên một trang
 
-/** Ghép từng dòng BOM với tồn kho: cần bao nhiêu cho số bộ muốn lắp, đang thiếu bao nhiêu */
+/**
+ * Ghép từng dòng BOM với tồn kho.
+ * total = cần cho số bộ muốn lắp, issued = đã xuất kho, need = còn phải xuất, short = kho còn thiếu.
+ */
 function analyse(lines, builds, componentsById) {
   return lines
     .map((line) => {
@@ -26,8 +29,10 @@ function analyse(lines, builds, componentsById) {
       const have = comp?.total_quantity ?? 0
       // Ô số lượng có thể đang bỏ trống trong lúc người dùng gõ
       const per = Number(line.quantity) >= 1 ? Number(line.quantity) : 0
-      const need = per * builds
-      return { line, comp, per, have, need, short: Math.max(0, need - have) }
+      const total = per * builds
+      const issued = Number(line.issued) || 0
+      const need = Math.max(0, total - issued)
+      return { line, comp, per, have, total, issued, need, short: Math.max(0, need - have) }
     })
     .filter((r) => r.comp)
     .sort((a, b) => a.comp.part_number.localeCompare(b.comp.part_number, 'vi', { numeric: true }))
@@ -38,14 +43,19 @@ export default function ProjectsPage() {
   const { canEdit } = useShell()
   const [params, setParams] = useSearchParams()
   const [bom, setBom] = useState(null) // null: đang tải, { error, missing }: lỗi, mảng: các dòng BOM
+  const [tracked, setTracked] = useState(false) // database có ghi nhớ số đã xuất của từng dòng BOM hay chưa
   const [attempt, setAttempt] = useState(0)
   const [dialog, setDialog] = useState(null) // { kind: 'form' | 'delete', project }
   const images = useProjectImages(version)
 
   useEffect(() => {
     let off = false
-    fetchAll(() => supabase.from('project_bom').select(BOM_COLUMNS).order('id'))
-      .then((rows) => !off && setBom(rows))
+    fetchBomLines()
+      .then((res) => {
+        if (off) return
+        setTracked(res.tracked)
+        setBom(res.rows)
+      })
       .catch((e) => !off && setBom({ error: friendlyError(e), missing: isMissingSchema(e) }))
     return () => {
       off = true
@@ -193,6 +203,7 @@ export default function ProjectsPage() {
               project={selected}
               lines={linesByProject.get(selected.id) ?? []}
               images={images}
+              tracked={tracked}
               setBom={setBom}
               refetchBom={() => setAttempt((n) => n + 1)}
               onEdit={() => setDialog({ kind: 'form', project: selected })}
@@ -215,7 +226,7 @@ export default function ProjectsPage() {
 /* ------------------------------------------------------------------ */
 /* Chi tiết một dự án: bảng BOM, tình trạng đủ/thiếu, xuất kho         */
 /* ------------------------------------------------------------------ */
-function ProjectDetail({ project, lines, images, setBom, refetchBom, onEdit, onDelete }) {
+function ProjectDetail({ project, lines, images, tracked, setBom, refetchBom, onEdit, onDelete }) {
   const { componentsById } = useData()
   const { openComponent, canEdit, isAdmin } = useShell()
   const toast = useToast()
@@ -225,6 +236,7 @@ function ProjectDetail({ project, lines, images, setBom, refetchBom, onEdit, onD
   const [addError, setAddError] = useState('')
   const [adding, setAdding] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const [page, setPage] = useState(0)
   const timers = useRef(new Map())
 
@@ -232,7 +244,11 @@ function ProjectDetail({ project, lines, images, setBom, refetchBom, onEdit, onD
   const rows = useMemo(() => analyse(lines, n, componentsById), [lines, n, componentsById])
   const missing = rows.filter((r) => r.short > 0)
   const counted = rows.filter((r) => r.per > 0)
-  const maxBuilds = counted.length ? Math.min(...counted.map((r) => Math.floor(r.have / r.per))) : 0
+  // Tổng số bộ lắp được, tính cả phần linh kiện đã xuất kho cho dự án
+  const maxBuilds = counted.length ? Math.min(...counted.map((r) => Math.floor((r.have + r.issued) / r.per))) : 0
+  const pending = counted.filter((r) => r.need > 0) // các dòng còn phải xuất
+  const issuedAny = rows.some((r) => r.issued > 0)
+  const allIssued = issuedAny && pending.length === 0
 
   // Bảng BOM chia trang; các phép tính đủ/thiếu ở trên vẫn tính trên toàn bộ BOM
   const pageCount = Math.max(1, Math.ceil(rows.length / BOM_PAGE))
@@ -249,11 +265,11 @@ function ProjectDetail({ project, lines, images, setBom, refetchBom, onEdit, onD
     const { data, error } = await supabase
       .from('project_bom')
       .insert({ project_id: project.id, component_id: addId, quantity: Number(addQty) })
-      .select(BOM_COLUMNS)
+      .select('*')
       .single()
     setAdding(false)
     if (error) return setAddError(friendlyError(error))
-    setBom((list) => (Array.isArray(list) ? [...list, data] : list))
+    setBom((list) => (Array.isArray(list) ? [...list, { ...data, issued: data.issued ?? 0 }] : list))
     // Nhảy tới trang chứa dòng vừa thêm (bảng xếp theo mã linh kiện)
     const part = componentsById.get(addId)?.part_number ?? ''
     const before = rows.filter((r) => r.comp.part_number.localeCompare(part, 'vi', { numeric: true }) < 0).length
@@ -295,7 +311,12 @@ function ProjectDetail({ project, lines, images, setBom, refetchBom, onEdit, onD
         onClick: async () => {
           const { error } = await supabase
             .from('project_bom')
-            .insert({ project_id: project.id, component_id: row.line.component_id, quantity: row.line.quantity })
+            .insert({
+              project_id: project.id,
+              component_id: row.line.component_id,
+              quantity: row.line.quantity,
+              ...(tracked ? { issued: row.line.issued ?? 0 } : {}),
+            })
           if (error) toast.push({ tone: 'error', message: `Không hoàn tác được. ${friendlyError(error)}`, duration: 9000 })
           refetchBom()
         },
@@ -306,6 +327,7 @@ function ProjectDetail({ project, lines, images, setBom, refetchBom, onEdit, onD
   function downloadMissing() {
     const header = ['part_number', 'ten', 'can', 'ton_kho', 'thieu']
     const body = missing.map((r) => [r.comp.part_number, r.comp.name, r.need, r.have, r.short])
+    // "can" là số còn phải xuất (đã trừ phần xuất rồi)
     downloadCSV(`thieu-${normalize(project.name).replace(/[^a-z0-9]+/g, '-')}.csv`, [header, ...body])
   }
 
@@ -350,10 +372,16 @@ function ProjectDetail({ project, lines, images, setBom, refetchBom, onEdit, onD
           <p className={`kk-banner ${missing.length > 0 ? 'kk-banner-warn' : 'kk-banner-ok'}`} role="status">
             {missing.length > 0 ? <AlertTriangle size={18} aria-hidden="true" /> : <CheckCircle2 size={18} aria-hidden="true" />}
             <span>
-              {missing.length > 0
-                ? `Thiếu ${fmtNum(missing.length)} món để lắp ${fmtNum(n)} bộ.`
-                : `Đủ linh kiện để lắp ${fmtNum(n)} bộ.`}{' '}
-              {maxBuilds > 0 ? `Kho hiện đủ cho tối đa ${fmtNum(maxBuilds)} bộ.` : 'Kho hiện chưa đủ cho bộ nào.'}
+              {allIssued
+                ? `Đã xuất đủ linh kiện cho ${fmtNum(n)} bộ.`
+                : missing.length > 0
+                  ? `Thiếu ${fmtNum(missing.length)} món để lắp ${fmtNum(n)} bộ.`
+                  : issuedAny
+                    ? `Kho đủ để xuất nốt ${fmtNum(pending.length)} món còn lại cho ${fmtNum(n)} bộ.`
+                    : `Đủ linh kiện để lắp ${fmtNum(n)} bộ.`}{' '}
+              {maxBuilds > 0
+                ? `${issuedAny ? 'Tính cả phần đã xuất, đủ' : 'Kho hiện đủ'} cho tối đa ${fmtNum(maxBuilds)} bộ.`
+                : 'Kho hiện chưa đủ cho bộ nào.'}
             </span>
           </p>
           <div className="kk-pane-actions">
@@ -364,10 +392,29 @@ function ProjectDetail({ project, lines, images, setBom, refetchBom, onEdit, onD
               </button>
             )}
             {canEdit && (
-              <button type="button" className="kk-btn kk-btn-primary kk-btn-sm" onClick={() => setExporting(true)}>
-                <ArrowUpFromLine size={16} />
-                Xuất kho theo BOM
-              </button>
+              <>
+                {tracked && issuedAny && (
+                  <button
+                    type="button"
+                    className="kk-btn kk-btn-outline kk-btn-sm"
+                    title="Đưa cột Đã xuất của dự án về 0 để lắp một đợt mới"
+                    onClick={() => setResetting(true)}
+                  >
+                    <RotateCcw size={16} />
+                    Bắt đầu đợt mới
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="kk-btn kk-btn-primary kk-btn-sm"
+                  disabled={pending.length === 0}
+                  title={allIssued ? 'Mọi linh kiện đã được xuất đủ. Tăng số bộ, thêm linh kiện, hoặc bắt đầu đợt mới.' : undefined}
+                  onClick={() => setExporting(true)}
+                >
+                  <ArrowUpFromLine size={16} />
+                  {allIssued ? 'Đã xuất đủ' : issuedAny ? `Xuất ${fmtNum(pending.length)} món còn lại` : 'Xuất kho theo BOM'}
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -386,6 +433,7 @@ function ProjectDetail({ project, lines, images, setBom, refetchBom, onEdit, onD
                 <th>Linh kiện</th>
                 <th>Mỗi bộ cần</th>
                 <th className="is-num">Tổng cần</th>
+                {tracked && <th className="is-num">Đã xuất</th>}
                 <th className="is-num">Tồn kho</th>
                 <th>Tình trạng</th>
                 {canEdit && (
@@ -420,13 +468,23 @@ function ProjectDetail({ project, lines, images, setBom, refetchBom, onEdit, onD
                     )}
                   </td>
                   <td data-label="Tổng cần" className="is-num kk-strong-num">
-                    {fmtNum(r.need)}
+                    {fmtNum(r.total)}
                   </td>
+                  {tracked && (
+                    <td data-label="Đã xuất" className="is-num" title={r.need > 0 ? `Còn phải xuất ${fmtNum(r.need)}` : 'Đã xuất đủ'}>
+                      {fmtNum(r.issued)} / {fmtNum(r.total)}
+                    </td>
+                  )}
                   <td data-label="Tồn kho" className="is-num">
                     {fmtNum(r.have)}
                   </td>
                   <td data-label="Tình trạng">
-                    {r.short > 0 ? (
+                    {r.per > 0 && r.need === 0 ? (
+                      <span className="kk-status kk-status-ok">
+                        <CheckCircle2 size={14} aria-hidden="true" />
+                        Đã xuất đủ
+                      </span>
+                    ) : r.short > 0 ? (
                       <span className="kk-status kk-status-low">
                         <AlertTriangle size={14} aria-hidden="true" />
                         Thiếu {fmtNum(r.short)}
@@ -515,7 +573,32 @@ function ProjectDetail({ project, lines, images, setBom, refetchBom, onEdit, onD
       </div>
       )}
 
-      {exporting && <BomExportModal project={project} rows={counted} builds={n} onClose={() => setExporting(false)} />}
+      {exporting && (
+        <BomExportModal
+          project={project}
+          rows={pending}
+          skipped={counted.length - pending.length}
+          builds={n}
+          tracked={tracked}
+          onIssued={refetchBom}
+          onClose={() => setExporting(false)}
+        />
+      )}
+      {resetting && (
+        <ConfirmDialog
+          title="Bắt đầu đợt lắp mới?"
+          text="Cột Đã xuất của mọi linh kiện trong dự án này sẽ về 0, nên lần xuất kho kế tiếp sẽ xuất lại toàn bộ BOM. Tồn kho và lịch sử không bị thay đổi."
+          confirmLabel="Bắt đầu đợt mới"
+          Icon={RotateCcw}
+          onConfirm={async () => {
+            mustChange(await supabase.from('project_bom').update({ issued: 0 }).eq('project_id', project.id).gt('issued', 0).select('id'))
+            setBuilds(1)
+            refetchBom()
+            toast.push({ message: `Đã bắt đầu đợt mới cho ${project.name}.` })
+          }}
+          onClose={() => setResetting(false)}
+        />
+      )}
     </section>
   )
 }
@@ -523,7 +606,7 @@ function ProjectDetail({ project, lines, images, setBom, refetchBom, onEdit, onD
 /* ------------------------------------------------------------------ */
 /* Xuất kho theo BOM: xem trước sẽ lấy hàng ở đâu, món nào thiếu       */
 /* ------------------------------------------------------------------ */
-function BomExportModal({ project, rows, builds, onClose }) {
+function BomExportModal({ project, rows, skipped, builds, tracked, onIssued, onClose }) {
   const { stockByComponent, reload } = useData()
   const toast = useToast()
   const undo = useUndoTx()
@@ -573,13 +656,29 @@ function BomExportModal({ project, rows, builds, onClose }) {
       setBusy(false)
       return setError(friendlyError(err))
     }
+    // Ghi nhớ số đã xuất của từng dòng, để lần sau không xuất lại
+    const setIssued = (value) =>
+      Promise.all(ready.map((p) => supabase.from('project_bom').update({ issued: value(p) }).eq('id', p.line.id).select('id')))
+    let noted = true
+    if (tracked) noted = (await setIssued((p) => p.issued + p.need)).every((r) => !r.error && r.data?.length > 0)
     await reload()
+    onIssued()
     toast.push({
-      message:
-        missing.length > 0
+      tone: noted ? undefined : 'error',
+      duration: noted ? undefined : 10000,
+      message: !noted
+        ? `Đã xuất kho ${fmtNum(ready.length)} món cho ${project.name}, nhưng chưa ghi được cột Đã xuất. Hãy kiểm tra lại trước khi xuất lần nữa.`
+        : missing.length > 0
           ? `Đã xuất ${fmtNum(ready.length)} món cho ${project.name}, còn ${fmtNum(missing.length)} món thiếu chưa xuất.`
           : `Đã xuất kho ${fmtNum(ready.length)} món cho ${project.name}.`,
-      action: { label: 'Hoàn tác', onClick: () => undo(data) },
+      action: {
+        label: 'Hoàn tác',
+        onClick: async () => {
+          if (!(await undo(data))) return
+          if (tracked) await setIssued((p) => p.issued)
+          onIssued()
+        },
+      },
     })
     onClose()
   }
@@ -626,6 +725,12 @@ function BomExportModal({ project, rows, builds, onClose }) {
               : 'Hãy nhập thêm hàng hoặc giảm số bộ muốn lắp.'}
           </div>
         </div>
+      )}
+
+      {skipped > 0 && (
+        <p className="kk-muted-text kk-bom-skipped">
+          {fmtNum(skipped)} linh kiện đã xuất đủ ở các lần trước nên không nằm trong lần xuất này.
+        </p>
       )}
 
       {ready.length > 0 && (

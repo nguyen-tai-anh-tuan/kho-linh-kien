@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { supabase } from '../supabaseClient'
-import { fetchAll } from '../lib/api'
+import { fetchBomLines } from '../lib/bom'
 import { useData } from './DataContext'
 
 /**
@@ -20,23 +19,26 @@ export function useBuyList(refreshKey) {
 
   useEffect(() => {
     let off = false
-    fetchAll(() => supabase.from('project_bom').select('id,project_id,component_id,quantity').order('id'))
-      .then((rows) => !off && setBomLines(rows))
+    fetchBomLines()
+      .then(({ rows }) => !off && setBomLines(rows))
       .catch(() => !off && setBomLines([])) // chưa có bảng BOM thì chỉ tính theo mức tối thiểu
     return () => {
       off = true
     }
   }, [version, refreshKey])
 
-  // Với mỗi linh kiện: tổng số cần để lắp mỗi dự án một bộ, và còn thiếu bao nhiêu so với tồn kho
+  // Với mỗi linh kiện: tổng số còn cần để lắp mỗi dự án một bộ, và còn thiếu bao nhiêu so với tồn kho
   const bomByComponent = useMemo(() => {
     const byId = new Map(projects.map((p) => [p.id, p]))
     const map = new Map()
     for (const l of bomLines) {
       if (!byId.has(l.project_id)) continue
       const item = map.get(l.component_id) ?? { total: 0, short: 0, uses: [] }
-      item.total += Number(l.quantity) || 0
-      item.uses.push({ project: byId.get(l.project_id), quantity: Number(l.quantity) || 0 })
+      // Phần đã xuất kho cho dự án rồi thì không cần mua nữa
+      const left = Math.max(0, (Number(l.quantity) || 0) - (Number(l.issued) || 0))
+      if (left === 0) continue
+      item.total += left
+      item.uses.push({ project: byId.get(l.project_id), quantity: left })
       map.set(l.component_id, item)
     }
     for (const c of components) {
