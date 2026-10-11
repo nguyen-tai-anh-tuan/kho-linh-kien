@@ -167,7 +167,10 @@ export default function ProjectsPage() {
                         </span>
                       )}
                       <span className="kk-pick-text">
-                        <strong>{p.name}</strong>
+                        <strong>
+                          {p.code && <span className="kk-prj">{p.code}</span>}
+                          {p.name}
+                        </strong>
                         <small className={short > 0 ? 'kk-warn-text' : ''}>
                           {own.length === 0
                             ? 'Chưa có BOM'
@@ -299,7 +302,10 @@ function ProjectDetail({ project, lines, images, setBom, refetchBom, onEdit, onD
     <section className="kk-card kk-table-card kk-card-open" aria-label={`Dự án ${project.name}`}>
       <div className="kk-pane-head">
         <div className="kk-pane-titles">
-          <h2>{project.name}</h2>
+          <h2>
+            {project.code && <span className="kk-prj">{project.code}</span>}
+            {project.name}
+          </h2>
           {project.description && <p className="kk-card-sub">{project.description}</p>}
         </div>
         {canEdit && (

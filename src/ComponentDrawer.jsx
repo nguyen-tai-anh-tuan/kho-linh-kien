@@ -25,7 +25,7 @@ import { fmtMoneyFull, fmtNum, fmtPrice, safeUrl, timeAgo } from './lib/format'
 const TYPE_LABEL = { in: 'Nhập', out: 'Xuất', adjust: 'Điều chỉnh' }
 
 export default function ComponentDrawer({ id, onClose }) {
-  const { componentsById, stockByComponent, categoriesById, toneByCategory, loading, version, reload } = useData()
+  const { componentsById, stockByComponent, categoriesById, toneByCategory, projectCode, loading, version, reload } = useData()
   const { openTx } = useTx()
   const { openForm, canEdit, isAdmin } = useShell()
   const toast = useToast()
@@ -341,7 +341,7 @@ export default function ComponentDrawer({ id, onClose }) {
                   <span>
                     {TYPE_LABEL[t.type]} {t.type === 'adjust' ? `còn ${fmtNum(t.quantity)}` : fmtNum(t.quantity)}
                     {t.location_path ? `, ${t.location_path}` : ''}
-                    {t.project_name ? `, dự án ${t.project_name}` : ''}
+                    {t.project_name ? `, ${projectCode(t.project_id) || `dự án ${t.project_name}`}` : ''}
                   </span>
                   <small>
                     {timeAgo(t.created_at)}

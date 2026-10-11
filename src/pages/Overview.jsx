@@ -24,7 +24,7 @@ import { fmtDay, fmtMoney, fmtMoneyFull, fmtNum, greeting, timeAgo } from '../li
 const RECENT_MAX = 30
 
 export default function Overview() {
-  const { components, categories, categoriesById, toneByCategory, loading, refreshing, error, reload, version } = useData()
+  const { components, categories, categoriesById, toneByCategory, projectCode, loading, refreshing, error, reload, version } = useData()
   const { openTx } = useTx()
   const { openComponent, openForm, canEdit } = useShell()
 
@@ -263,7 +263,7 @@ export default function Overview() {
                   <button type="button" className="kk-list-row" onClick={() => openComponent(t.component_id)}>
                     <ActivityIcon type={t.type} />
                     <span className="kk-list-main">
-                      <span>{describeTx(t)}</span>
+                      <span title={t.project_name ? `Dự án ${t.project_name}` : undefined}>{describeTx(t, projectCode(t.project_id))}</span>
                       <small>
                         {timeAgo(t.created_at)}
                         {t.actor_name ? `, bởi ${t.actor_name}` : ''}
@@ -477,12 +477,12 @@ function ActivityIcon({ type }) {
   )
 }
 
-function describeTx(t) {
+function describeTx(t, code) {
   const name = t.component_name
   const where = t.location_path ? ` ${t.type === 'out' ? 'từ' : 'tại'} ${t.location_path}` : ''
   if (t.type === 'in') return `Nhập ${fmtNum(t.quantity)} × ${name} vào ${t.location_path ?? 'kho'}`
   if (t.type === 'out') {
-    const proj = t.project_name ? ` cho dự án ${t.project_name}` : ''
+    const proj = t.project_name ? ` cho ${code || `dự án ${t.project_name}`}` : ''
     return `Xuất ${fmtNum(t.quantity)} × ${name}${where}${proj}`
   }
   const before = t.delta === null || t.delta === undefined ? null : t.quantity - t.delta

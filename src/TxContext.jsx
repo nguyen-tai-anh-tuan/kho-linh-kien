@@ -337,7 +337,7 @@ function TxModal({ type: initialType = 'in', componentId, componentIds, location
                 value={projectId}
                 onChange={setProjectId}
                 placeholder="Không gắn dự án"
-                options={projects.map((p) => ({ value: p.id, label: p.name }))}
+                options={projects.map((p) => ({ value: p.id, label: p.code ? `${p.code} · ${p.name}` : p.name }))}
                 onCreate={createProject}
                 createLabel="Thêm dự án mới"
               />

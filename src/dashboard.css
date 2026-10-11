@@ -3064,3 +3064,41 @@ button.kk-mega-name:hover {
   font-size: 0.78rem;
   color: var(--kk-warn);
 }
+
+/* Mã dự án PRJ-xx */
+.kk-prj {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 7px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--kk-soft);
+  color: var(--kk-link);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+  text-decoration: none;
+  vertical-align: middle;
+}
+a.kk-prj:hover {
+  border-color: var(--primary);
+}
+.kk-buy-why {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+.kk-buy-why .kk-prj {
+  margin-right: 0;
+  color: var(--kk-warn);
+  background: var(--kk-warn-bg);
+  border-color: var(--kk-warn-line);
+}
+.kk-buy-more {
+  font-size: 0.76rem;
+  color: var(--muted);
+}

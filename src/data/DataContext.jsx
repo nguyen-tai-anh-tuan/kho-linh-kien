@@ -28,6 +28,18 @@ async function loadCategories() {
   }
 }
 
+/** Danh sách dự án kèm số mã. Chưa chạy sql/10_project_codes.sql thì dự án chưa có mã. */
+async function loadProjects() {
+  const full = await supabase.from('projects').select('id,name,description,code_no').order('name')
+  if (!full.error) return full.data
+  const plain = await supabase.from('projects').select('id,name,description').order('name')
+  if (plain.error) throw plain.error
+  return plain.data
+}
+
+/** Số mã 1, 2, 3... hiển thị thành PRJ-01, PRJ-02, PRJ-03... */
+const projectCodeOf = (no) => (no ? `PRJ-${String(no).padStart(2, '0')}` : '')
+
 /** Mức cảnh báo chung và theo danh mục. Chưa chạy sql/08_warning_levels.sql thì ready = false. */
 async function loadLevels() {
   const [general, byCategory] = await Promise.all([
@@ -74,7 +86,7 @@ export function DataProvider({ children }) {
           .select('id,name,parent_id,path,depth,qr_code')
           .order('path')
           .then(must),
-        supabase.from('projects').select('id,name,description').order('name').then(must),
+        loadProjects(),
         loadLevels(),
       ])
       if (!alive.current) return
@@ -124,6 +136,11 @@ export function DataProvider({ children }) {
     const rootTone = new Map((categoryChildren.get(null) ?? []).map((c, i) => [c.id, i % 6]))
     const toneByCategory = new Map(categories.map((c) => [c.id, rootTone.get(c.root_id) ?? 0]))
 
+    // Dự án kèm mã PRJ-xx. Ở những nơi chỉ có id dự án (lịch sử giao dịch) thì tra mã qua projectCode(id).
+    const projects = raw.projects.map((p) => ({ ...p, code: projectCodeOf(p.code_no) }))
+    const projectsById = new Map(projects.map((p) => [p.id, p]))
+    const projectCode = (id) => projectsById.get(id)?.code ?? ''
+
     // Mức cảnh báo: mức riêng của linh kiện -> danh mục gần nhất có đặt mức -> mức chung
     const levels = {
       ready: raw.levels.ready,
@@ -162,6 +179,9 @@ export function DataProvider({ children }) {
       components,
       archivedComponents,
       allComponents: raw.components,
+      projects,
+      projectsById,
+      projectCode,
       levels,
       levelFor,
       locationsById,

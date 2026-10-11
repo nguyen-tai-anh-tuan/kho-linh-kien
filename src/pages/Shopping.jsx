@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowDownToLine, ClipboardCopy, Download, Search } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { useTx } from '../TxContext'
@@ -19,6 +19,9 @@ const KINDS = [
   { key: 'low', label: 'Sắp hết' },
   { key: 'bom', label: 'Thiếu cho dự án' },
 ]
+
+// Mỗi linh kiện hiện tối đa chừng này nhãn dự án, còn lại gộp vào "+N dự án khác"
+const MAX_TAGS = 3
 
 /**
  * Số lượng nên mua: đủ để về lại mức tối thiểu VÀ đủ lắp mỗi dự án một bộ (lấy số lớn hơn).
@@ -66,13 +69,13 @@ export default function ShoppingPage() {
 
   // Với mỗi linh kiện: tổng số cần để lắp mỗi dự án một bộ, và còn thiếu bao nhiêu so với tồn kho
   const bomByComponent = useMemo(() => {
-    const names = new Map(projects.map((p) => [p.id, p.name]))
+    const byId = new Map(projects.map((p) => [p.id, p]))
     const map = new Map()
     for (const l of bomLines) {
-      if (!names.has(l.project_id)) continue
+      if (!byId.has(l.project_id)) continue
       const item = map.get(l.component_id) ?? { total: 0, uses: [] }
       item.total += Number(l.quantity) || 0
-      item.uses.push({ name: names.get(l.project_id), quantity: Number(l.quantity) || 0 })
+      item.uses.push({ project: byId.get(l.project_id), quantity: Number(l.quantity) || 0 })
       map.set(l.component_id, item)
     }
     for (const c of components) {
@@ -275,8 +278,28 @@ export default function ShoppingPage() {
                           />
                         </span>
                         {bom?.short > 0 && (
-                          <span className="kk-buy-why">
-                            Dự án cần {fmtNum(bom.total)}: {bom.uses.map((u) => `${u.name} (${fmtNum(u.quantity)})`).join(', ')}
+                          <span className="kk-buy-why" onClick={(e) => e.stopPropagation()}>
+                            {bom.uses.slice(0, MAX_TAGS).map((u) => (
+                              <Link
+                                key={u.project.id}
+                                className="kk-prj"
+                                to={`/projects?p=${u.project.id}`}
+                                title={`${u.project.name}: mỗi bộ cần ${fmtNum(u.quantity)}. Bấm để mở dự án.`}
+                              >
+                                {u.project.code || u.project.name} ×{fmtNum(u.quantity)}
+                              </Link>
+                            ))}
+                            {bom.uses.length > MAX_TAGS && (
+                              <span
+                                className="kk-buy-more"
+                                title={bom.uses
+                                  .slice(MAX_TAGS)
+                                  .map((u) => `${u.project.code ? `${u.project.code} ` : ''}${u.project.name}: ${fmtNum(u.quantity)}`)
+                                  .join('\n')}
+                              >
+                                +{fmtNum(bom.uses.length - MAX_TAGS)} dự án khác
+                              </span>
+                            )}
                           </span>
                         )}
                       </td>

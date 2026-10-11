@@ -42,7 +42,7 @@ function applyFilters(query, f) {
 }
 
 export default function HistoryPage() {
-  const { locations, projects, version } = useData()
+  const { locations, projects, projectCode, version } = useData()
   const { openTx } = useTx()
   const { openComponent, canEdit } = useShell()
   const toast = useToast()
@@ -111,7 +111,7 @@ export default function HistoryPage() {
     setExporting(true)
     try {
       const all = await fetchAll(() => applyFilters(supabase.from('transactions_feed').select('*'), filters))
-      const header = ['thoi_gian', 'loai', 'part_number', 'ten', 'so_luong', 'thay_doi', 'vi_tri', 'du_an', 'nguoi_thuc_hien', 'ghi_chu']
+      const header = ['thoi_gian', 'loai', 'part_number', 'ten', 'so_luong', 'thay_doi', 'vi_tri', 'ma_du_an', 'du_an', 'nguoi_thuc_hien', 'ghi_chu']
       const body = all.map((t) => [
         fmtDateTime(t.created_at),
         TYPES[t.type]?.label ?? t.type,
@@ -120,6 +120,7 @@ export default function HistoryPage() {
         t.quantity,
         t.delta,
         t.location_path,
+        projectCode(t.project_id),
         t.project_name,
         t.actor_name,
         t.note,
@@ -178,7 +179,7 @@ export default function HistoryPage() {
             <option value="">Mọi dự án</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name}
+                {p.code ? `${p.code} · ${p.name}` : p.name}
               </option>
             ))}
           </select>
@@ -286,7 +287,17 @@ export default function HistoryPage() {
                           <Quantity t={t} />
                         </td>
                         <td data-label="Vị trí">{t.location_path || '—'}</td>
-                        <td data-label="Dự án">{t.project_name || '—'}</td>
+                        <td data-label="Dự án">
+                          {!t.project_name ? (
+                            '—'
+                          ) : projectCode(t.project_id) ? (
+                            <span className="kk-prj" title={t.project_name}>
+                              {projectCode(t.project_id)}
+                            </span>
+                          ) : (
+                            t.project_name
+                          )}
+                        </td>
                         <td data-label="Người thực hiện">{t.actor_name || '—'}</td>
                         <td data-label="Ghi chú" className="kk-cell-note">
                           {t.note || '—'}
