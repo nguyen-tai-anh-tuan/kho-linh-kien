@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { AlertTriangle, ArrowUpFromLine, CheckCircle2, CircuitBoard, Download, Loader2, Pencil, Plus, Save, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowUpFromLine, CheckCircle2, ChevronLeft, ChevronRight, CircuitBoard, Download, Loader2, Pencil, Plus, Save, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
 import { useUndoTx } from '../TxContext'
@@ -16,6 +16,7 @@ import { removeProjectFiles } from '../lib/images'
 import { ProjectGallery, useProjectImages } from './ProjectImages'
 
 const BOM_COLUMNS = 'id,project_id,component_id,quantity'
+const BOM_PAGE = 10 // số dòng BOM trên một trang
 
 /** Ghép từng dòng BOM với tồn kho: cần bao nhiêu cho số bộ muốn lắp, đang thiếu bao nhiêu */
 function analyse(lines, builds, componentsById) {
@@ -224,6 +225,7 @@ function ProjectDetail({ project, lines, images, setBom, refetchBom, onEdit, onD
   const [addError, setAddError] = useState('')
   const [adding, setAdding] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [page, setPage] = useState(0)
   const timers = useRef(new Map())
 
   const n = Number(builds) >= 1 ? Number(builds) : 1
@@ -231,6 +233,11 @@ function ProjectDetail({ project, lines, images, setBom, refetchBom, onEdit, onD
   const missing = rows.filter((r) => r.short > 0)
   const counted = rows.filter((r) => r.per > 0)
   const maxBuilds = counted.length ? Math.min(...counted.map((r) => Math.floor(r.have / r.per))) : 0
+
+  // Bảng BOM chia trang; các phép tính đủ/thiếu ở trên vẫn tính trên toàn bộ BOM
+  const pageCount = Math.max(1, Math.ceil(rows.length / BOM_PAGE))
+  const safePage = Math.min(page, pageCount - 1)
+  const pageRows = rows.slice(safePage * BOM_PAGE, (safePage + 1) * BOM_PAGE)
 
   async function addLine() {
     if (adding) return
@@ -247,6 +254,10 @@ function ProjectDetail({ project, lines, images, setBom, refetchBom, onEdit, onD
     setAdding(false)
     if (error) return setAddError(friendlyError(error))
     setBom((list) => (Array.isArray(list) ? [...list, data] : list))
+    // Nhảy tới trang chứa dòng vừa thêm (bảng xếp theo mã linh kiện)
+    const part = componentsById.get(addId)?.part_number ?? ''
+    const before = rows.filter((r) => r.comp.part_number.localeCompare(part, 'vi', { numeric: true }) < 0).length
+    setPage(Math.floor(before / BOM_PAGE))
     setAddId(null)
     setAddQty(1)
   }
@@ -385,7 +396,7 @@ function ProjectDetail({ project, lines, images, setBom, refetchBom, onEdit, onD
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {pageRows.map((r) => (
                 <tr key={r.line.id}>
                   <td data-label="Linh kiện" className="kk-cell-main">
                     <button type="button" className="kk-row-link" onClick={() => openComponent(r.comp.id)}>
@@ -444,6 +455,36 @@ function ProjectDetail({ project, lines, images, setBom, refetchBom, onEdit, onD
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {rows.length > BOM_PAGE && (
+        <div className="kk-pager">
+          <span>
+            Hiển thị {fmtNum(safePage * BOM_PAGE + 1)} đến {fmtNum(safePage * BOM_PAGE + pageRows.length)} trong {fmtNum(rows.length)} linh kiện
+          </span>
+          <div>
+            <button
+              type="button"
+              className="kk-icon-btn kk-icon-btn-boxed"
+              aria-label="Trang trước"
+              disabled={safePage === 0}
+              onClick={() => setPage(safePage - 1)}
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <span className="kk-pager-num">
+              {safePage + 1} / {pageCount}
+            </span>
+            <button
+              type="button"
+              className="kk-icon-btn kk-icon-btn-boxed"
+              aria-label="Trang sau"
+              disabled={safePage >= pageCount - 1}
+              onClick={() => setPage(safePage + 1)}
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
         </div>
       )}
 
