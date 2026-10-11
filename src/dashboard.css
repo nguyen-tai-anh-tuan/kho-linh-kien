@@ -2919,3 +2919,142 @@ button.kk-mega-name:hover {
   font-size: 0.8rem;
   color: var(--muted);
 }
+
+/* Ảnh dự án */
+.kk-pick.kk-pick-media {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+.kk-pick-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.kk-pick-thumb {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  object-fit: cover;
+  background: var(--kk-soft);
+}
+.kk-pick-thumb-none {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.kk-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 220px));
+  gap: 12px;
+  padding: 0 20px 16px;
+}
+.kk-gallery-note {
+  padding: 0 20px 14px;
+  font-size: 0.85rem;
+}
+.kk-shot {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin: 0;
+}
+.kk-shot-view,
+.kk-shot-add {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--kk-soft);
+}
+.kk-shot-view {
+  cursor: zoom-in;
+}
+.kk-shot-view img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.2s ease;
+}
+.kk-shot-view:hover img {
+  transform: scale(1.03);
+}
+.kk-shot-wait {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.kk-shot-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-style: dashed;
+  border-width: 1.5px;
+  background: none;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+.kk-shot-add:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--kk-link);
+  background: var(--kk-hover);
+}
+.kk-shot-add small {
+  font-size: 0.74rem;
+  font-weight: 500;
+}
+.kk-shot figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 32px;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.kk-shot-tools {
+  display: flex;
+}
+.kk-shot-tools .kk-icon-btn {
+  width: 30px;
+  height: 30px;
+}
+.kk-lightbox-img {
+  display: block;
+  max-width: 100%;
+  max-height: 72dvh;
+  margin: 0 auto;
+  border-radius: 12px;
+}
+.kk-lightbox-wait {
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .kk-shot-view img {
+    transition: none;
+  }
+}
+@media (max-width: 720px) {
+  .kk-gallery {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 0 14px 14px;
+  }
+  .kk-shot-add small {
+    display: none;
+  }
+}

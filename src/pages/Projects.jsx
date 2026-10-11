@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { AlertTriangle, ArrowUpFromLine, CheckCircle2, Download, Loader2, Pencil, Plus, Save, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowUpFromLine, CheckCircle2, CircuitBoard, Download, Loader2, Pencil, Plus, Save, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
 import { useUndoTx } from '../TxContext'
@@ -12,6 +12,8 @@ import { ComponentPicker, EmptyState, Field, QtyStepper, Skeleton } from '../ui/
 import { fetchAll, friendlyError, isMissingSchema, mustChange } from '../lib/api'
 import { downloadCSV } from '../lib/csv'
 import { fmtNum, normalize } from '../lib/format'
+import { removeProjectFiles } from '../lib/images'
+import { ProjectGallery, useProjectImages } from './ProjectImages'
 
 const BOM_COLUMNS = 'id,project_id,component_id,quantity'
 
@@ -37,6 +39,7 @@ export default function ProjectsPage() {
   const [bom, setBom] = useState(null) // null: đang tải, { error, missing }: lỗi, mảng: các dòng BOM
   const [attempt, setAttempt] = useState(0)
   const [dialog, setDialog] = useState(null) // { kind: 'form' | 'delete', project }
+  const images = useProjectImages(version)
 
   useEffect(() => {
     let off = false
@@ -146,22 +149,33 @@ export default function ProjectsPage() {
                 const own = linesByProject.get(p.id) ?? []
                 const short = analyse(own, 1, componentsById).filter((r) => r.short > 0).length
                 const on = selected?.id === p.id
+                const cover = images.rows.find((r) => r.project_id === p.id && r.slot === 0)
+                const coverUrl = cover ? images.urls.get(cover.thumb_path) : null
                 return (
                   <li key={p.id}>
                     <button
                       type="button"
-                      className={`kk-pick ${on ? 'is-on' : ''}`}
+                      className={`kk-pick kk-pick-media ${on ? 'is-on' : ''}`}
                       aria-current={on ? 'true' : undefined}
                       onClick={() => select(p.id)}
                     >
-                      <strong>{p.name}</strong>
-                      <small className={short > 0 ? 'kk-warn-text' : ''}>
-                        {own.length === 0
-                          ? 'Chưa có BOM'
-                          : short > 0
-                            ? `${fmtNum(own.length)} món, thiếu ${fmtNum(short)}`
-                            : `${fmtNum(own.length)} món, đủ hàng`}
-                      </small>
+                      {coverUrl ? (
+                        <img className="kk-pick-thumb" src={coverUrl} alt="" loading="lazy" />
+                      ) : (
+                        <span className="kk-pick-thumb kk-pick-thumb-none" aria-hidden="true">
+                          <CircuitBoard size={18} />
+                        </span>
+                      )}
+                      <span className="kk-pick-text">
+                        <strong>{p.name}</strong>
+                        <small className={short > 0 ? 'kk-warn-text' : ''}>
+                          {own.length === 0
+                            ? 'Chưa có BOM'
+                            : short > 0
+                              ? `${fmtNum(own.length)} món, thiếu ${fmtNum(short)}`
+                              : `${fmtNum(own.length)} món, đủ hàng`}
+                        </small>
+                      </span>
                     </button>
                   </li>
                 )
@@ -174,6 +188,7 @@ export default function ProjectsPage() {
               key={selected.id}
               project={selected}
               lines={linesByProject.get(selected.id) ?? []}
+              images={images}
               setBom={setBom}
               refetchBom={() => setAttempt((n) => n + 1)}
               onEdit={() => setDialog({ kind: 'form', project: selected })}
@@ -196,7 +211,7 @@ export default function ProjectsPage() {
 /* ------------------------------------------------------------------ */
 /* Chi tiết một dự án: bảng BOM, tình trạng đủ/thiếu, xuất kho         */
 /* ------------------------------------------------------------------ */
-function ProjectDetail({ project, lines, setBom, refetchBom, onEdit, onDelete }) {
+function ProjectDetail({ project, lines, images, setBom, refetchBom, onEdit, onDelete }) {
   const { componentsById } = useData()
   const { openComponent, canEdit, isAdmin } = useShell()
   const toast = useToast()
@@ -300,6 +315,14 @@ function ProjectDetail({ project, lines, setBom, refetchBom, onEdit, onDelete })
           </div>
         )}
       </div>
+
+      <ProjectGallery
+        project={project}
+        images={images.rows.filter((r) => r.project_id === project.id)}
+        urls={images.urls}
+        missing={images.missing}
+        onChanged={images.refresh}
+      />
 
       {rows.length > 0 && (
         <div className="kk-pane-bar kk-bom-bar">
@@ -637,7 +660,7 @@ function ProjectForm({ initial, onSaved, onClose }) {
   return (
     <Modal
       title={initial ? 'Sửa dự án' : 'Thêm dự án'}
-      subtitle={initial ? undefined : 'Sau khi tạo, bạn thêm linh kiện vào BOM của dự án.'}
+      subtitle={initial ? undefined : 'Sau khi tạo, bạn thêm ảnh và linh kiện vào BOM ngay trong trang dự án.'}
       onClose={onClose}
       footer={
         <>
@@ -685,10 +708,12 @@ function DeleteProject({ project, afterDelete, onClose }) {
   return (
     <ConfirmDialog
       title={`Xóa dự án ${project.name}?`}
-      text="Danh sách BOM của dự án cũng bị xóa theo. Việc này không hoàn tác được."
+      text="Danh sách BOM và các ảnh của dự án cũng bị xóa theo. Việc này không hoàn tác được."
       confirmLabel="Xóa dự án"
       Icon={Trash2}
       onConfirm={async () => {
+        // Dọn file ảnh trước, vì xóa dự án xong thì không còn biết ảnh nào của nó
+        await removeProjectFiles(project.id)
         mustChange(await supabase.from('projects').delete().eq('id', project.id).select('id'))
         afterDelete()
         await reload()
