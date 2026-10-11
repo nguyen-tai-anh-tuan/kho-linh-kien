@@ -22,7 +22,7 @@ import { fmtNum, fmtPrice, normalize } from '../lib/format'
 import { CategoryFilter } from '../ui/CategoryMenu'
 import { subtreeIds } from '../lib/tree'
 
-const PAGE_SIZE = 25
+const PAGE_SIZE = 10
 const STATUS_ORDER = { out: 0, low: 1, ok: 2 }
 
 const COLUMNS = [
