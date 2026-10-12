@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowDownToLine, ChevronDown, ChevronRight, FolderPlus, Pencil, Plus, Trash2 } from 'lucide-react'
+import { ArrowDownToLine, ChevronDown, ChevronLeft, ChevronRight, FolderPlus, Pencil, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
 import { useTx } from '../TxContext'
@@ -14,6 +14,7 @@ import { fmtNum, normalize } from '../lib/format'
 
 // Tên gọi theo tầng: tủ → ngăn → hộc (từ tầng thứ ba trở xuống đều gọi là hộc)
 const LEVELS = ['tủ', 'ngăn', 'hộc']
+const PAGE_SIZE = 10 // số linh kiện trên một trang của bảng bên phải
 const levelName = (depth) => LEVELS[Math.min(depth, LEVELS.length - 1)]
 
 export default function LocationsPage() {
@@ -25,6 +26,7 @@ export default function LocationsPage() {
   const [collapsed, setCollapsed] = useState(() => new Set())
   const [includeSub, setIncludeSub] = useState(true)
   const [dialog, setDialog] = useState(null) // { kind: 'add' | 'rename' | 'delete', loc }
+  const [paging, setPaging] = useState({ key: '', page: 0 }) // trang đang xem của từng vị trí
 
   const childrenOf = useMemo(() => buildTree(locations), [locations])
 
@@ -158,6 +160,13 @@ export default function LocationsPage() {
       ? 'Vị trí này đang có hàng. Hãy chuyển hoặc xuất hết hàng trước khi xóa.'
       : ''
   const totalQty = rows.reduce((sum, r) => sum + r.quantity, 0)
+
+  // Chia trang bảng linh kiện. Đổi vị trí hoặc bật/tắt "gồm ngăn con" thì quay về trang đầu.
+  const pagingKey = `${selected?.id ?? ''}|${includeSub}`
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
+  const page = Math.min(paging.key === pagingKey ? paging.page : 0, pageCount - 1)
+  const pageRows = rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const goTo = (n) => setPaging({ key: pagingKey, page: n })
 
   return (
     <div className={`kk-page ${refreshing ? 'is-refreshing' : ''}`}>
@@ -338,7 +347,7 @@ export default function LocationsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {rows.map((r) => (
+                      {pageRows.map((r) => (
                         <tr key={r.key} onClick={() => openComponent(r.comp.id)}>
                           <td data-label="Linh kiện" className="kk-cell-main">
                             <button
@@ -364,6 +373,36 @@ export default function LocationsPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+              {rows.length > PAGE_SIZE && (
+                <div className="kk-pager">
+                  <span>
+                    Hiển thị {fmtNum(page * PAGE_SIZE + 1)} đến {fmtNum(page * PAGE_SIZE + pageRows.length)} trong {fmtNum(rows.length)} dòng
+                  </span>
+                  <div>
+                    <button
+                      type="button"
+                      className="kk-icon-btn kk-icon-btn-boxed"
+                      aria-label="Trang trước"
+                      disabled={page === 0}
+                      onClick={() => goTo(page - 1)}
+                    >
+                      <ChevronLeft size={18} />
+                    </button>
+                    <span className="kk-pager-num">
+                      {page + 1} / {pageCount}
+                    </span>
+                    <button
+                      type="button"
+                      className="kk-icon-btn kk-icon-btn-boxed"
+                      aria-label="Trang sau"
+                      disabled={page >= pageCount - 1}
+                      onClick={() => goTo(page + 1)}
+                    >
+                      <ChevronRight size={18} />
+                    </button>
+                  </div>
                 </div>
               )}
             </section>

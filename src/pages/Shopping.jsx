@@ -1,6 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowDownToLine, ClipboardCopy, Download, Search } from 'lucide-react'
+import { ArrowDownToLine, ChevronLeft, ChevronRight, ClipboardCopy, Download, Search } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { useBuyList } from '../data/useBuyList'
 import { useTx } from '../TxContext'
@@ -21,6 +21,7 @@ const KINDS = [
 
 // Mỗi linh kiện hiện tối đa chừng này nhãn dự án, còn lại gộp vào "+N dự án khác"
 const MAX_TAGS = 3
+const PAGE_SIZE = 10
 
 /** Trang "Cần mua": mọi linh kiện đang hết hàng hoặc dưới mức tồn tối thiểu */
 export default function ShoppingPage() {
@@ -68,6 +69,14 @@ export default function ShoppingPage() {
       return true
     })
   }, [toBuy, bomByComponent, searchText, categoryChildren, q, kind, cat])
+
+  // Chia trang; chép danh sách, xuất CSV và ước tính chi phí vẫn tính trên toàn bộ danh sách đang lọc
+  const [paging, setPaging] = useState({ key: '', page: 0 })
+  const pagingKey = `${q}|${kind}|${cat}`
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
+  const page = Math.min(paging.key === pagingKey ? paging.page : 0, pageCount - 1)
+  const pageRows = rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const goTo = (n) => setPaging({ key: pagingKey, page: n })
 
   const priced = rows.filter((c) => Number(c.unit_price) > 0)
   const cost = priced.reduce((sum, c) => sum + need(c) * Number(c.unit_price), 0)
@@ -203,7 +212,7 @@ export default function ShoppingPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((c) => {
+                  {pageRows.map((c) => {
                     const bom = bomByComponent.get(c.id)
                     return (
                     <tr key={c.id} onClick={() => openComponent(c.id)}>
@@ -303,6 +312,36 @@ export default function ShoppingPage() {
                 </tbody>
               </table>
             </div>
+            {rows.length > PAGE_SIZE && (
+              <div className="kk-pager">
+                <span>
+                  Hiển thị {fmtNum(page * PAGE_SIZE + 1)} đến {fmtNum(page * PAGE_SIZE + pageRows.length)} trong {fmtNum(rows.length)} linh kiện
+                </span>
+                <div>
+                  <button
+                    type="button"
+                    className="kk-icon-btn kk-icon-btn-boxed"
+                    aria-label="Trang trước"
+                    disabled={page === 0}
+                    onClick={() => goTo(page - 1)}
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <span className="kk-pager-num">
+                    {page + 1} / {pageCount}
+                  </span>
+                  <button
+                    type="button"
+                    className="kk-icon-btn kk-icon-btn-boxed"
+                    aria-label="Trang sau"
+                    disabled={page >= pageCount - 1}
+                    onClick={() => goTo(page + 1)}
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="kk-pager">
               <span>
                 {fmtNum(rows.length)} linh kiện
