@@ -47,8 +47,11 @@ export function useProjectImages(version) {
 }
 
 /** Dải ảnh ở đầu trang chi tiết dự án: xem, thêm, đổi, xóa */
-export function ProjectGallery({ project, images, urls, missing, onChanged }) {
-  const { canEdit, isAdmin } = useShell()
+export function ProjectGallery({ project, images, urls, missing, onChanged, readOnly = false }) {
+  const shell = useShell()
+  // readOnly: trang xem chi tiết chỉ hiện ảnh, không có nút thêm / đổi / xóa
+  const canEdit = shell.canEdit && !readOnly
+  const isAdmin = shell.isAdmin
   const toast = useToast()
   const [busy, setBusy] = useState(null) // ô đang tải lên
   const [viewing, setViewing] = useState(null) // { row, label }
@@ -86,7 +89,7 @@ export function ProjectGallery({ project, images, urls, missing, onChanged }) {
   }
 
   return (
-    <div className="kk-gallery" aria-label={`Ảnh của dự án ${project.name}`}>
+    <div className={`kk-gallery ${readOnly ? 'kk-gallery-view' : ''}`} aria-label={`Ảnh của dự án ${project.name}`}>
       {SLOTS.map((slot, i) => {
         const row = bySlot.get(i)
         const url = row ? urls.get(row.thumb_path) : null

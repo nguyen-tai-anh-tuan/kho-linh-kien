@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { AlertTriangle, ArrowUpFromLine, CheckCircle2, ChevronLeft, ChevronRight, CircuitBoard, Download, RotateCcw, Loader2, Pencil, Plus, Save, Trash2 } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { AlertTriangle, ArrowUpFromLine, CheckCircle2, ChevronLeft, ChevronRight, CircuitBoard, Download, Eye, RotateCcw, Loader2, Pencil, Plus, Save, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
 import { useUndoTx } from '../TxContext'
@@ -415,8 +415,13 @@ function ProjectDetail({ project, lines, images, tracked, setBom, refetchBom, on
           </h2>
           {project.description && <p className="kk-card-sub">{project.description}</p>}
         </div>
+        <div className="kk-pane-actions">
+          <Link className="kk-btn kk-btn-outline kk-btn-sm" to={`/projects/${project.id}`} title="Xem toàn bộ linh kiện, tiến độ xuất kho và lịch sử của dự án">
+            <Eye size={16} />
+            Xem chi tiết
+          </Link>
         {canEdit && (
-          <div className="kk-pane-actions">
+          <>
             <button type="button" className="kk-icon-btn kk-icon-btn-boxed" aria-label="Sửa dự án" title="Sửa dự án" onClick={onEdit}>
               <Pencil size={16} />
             </button>
@@ -425,8 +430,9 @@ function ProjectDetail({ project, lines, images, tracked, setBom, refetchBom, on
                 <Trash2 size={16} />
               </button>
             )}
-          </div>
+          </>
         )}
+        </div>
       </div>
 
       <ProjectGallery

@@ -34,6 +34,7 @@ import ComponentsPage from './pages/Components'
 import ShoppingPage from './pages/Shopping'
 import LocationsPage from './pages/Locations'
 import ProjectsPage from './pages/Projects'
+import ProjectViewPage from './pages/ProjectView'
 import HistoryPage from './pages/History'
 import SettingsPage from './pages/Settings'
 import { Modal } from './ui/Modal'
@@ -329,6 +330,7 @@ function Shell({ session, profile, reloadProfile }) {
               <Route path="/buy" element={<ShoppingPage />} />
               <Route path="/locations" element={<LocationsPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
+              <Route path="/projects/:id" element={<ProjectViewPage />} />
               <Route path="/history" element={<HistoryPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />

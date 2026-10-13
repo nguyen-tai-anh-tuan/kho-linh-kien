@@ -3129,3 +3129,120 @@ a.kk-prj:hover {
   margin-top: 2px;
   accent-color: var(--primary);
 }
+
+/* Trang xem chi tiết dự án */
+.kk-pv-back {
+  margin-bottom: 14px;
+}
+.kk-prj-lg {
+  font-size: 0.95rem;
+  padding: 2px 10px;
+  margin-right: 10px;
+}
+.kk-pv .kk-gallery {
+  padding: 0;
+  margin-bottom: 16px;
+}
+.kk-gallery-view {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  max-width: 980px;
+}
+.kk-pv-stats {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+.kk-pv-value {
+  font-size: 1.5rem;
+  overflow-wrap: anywhere;
+}
+.kk-pv-note {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.kk-pv-bar {
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin: 4px 0;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--kk-grid);
+}
+.kk-pv-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--series-4);
+}
+.kk-pv-bar i.is-full {
+  background: var(--series-3);
+}
+.kk-pv-issued {
+  display: inline-block;
+  min-width: 96px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.kk-pv-group th {
+  padding: 10px 16px;
+  background: var(--kk-soft);
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-align: left;
+}
+.kk-pv-group th span {
+  margin-left: 10px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.kk-pv-history {
+  max-height: 420px;
+}
+@media (max-width: 720px) {
+  .kk-gallery-view {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .kk-pv-group th {
+    display: block;
+  }
+}
+
+/* In / lưu PDF: chỉ in nội dung trang, bỏ thanh bên, thanh trên và các nút */
+@media print {
+  .kk-side,
+  .kk-top,
+  .kk-tabbar,
+  .kk-no-print,
+  .kk-pv-back,
+  .kk-toasts {
+    display: none !important;
+  }
+  .kk,
+  .kk-main,
+  .kk-content {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  .kk-pv .kk-card,
+  .kk-pv .kk-stat {
+    break-inside: avoid;
+    box-shadow: none;
+  }
+  .kk-pv .kk-table-card {
+    break-inside: auto;
+  }
+  .kk-pv .kk-table-scroll,
+  .kk-pv .kk-list-scroll {
+    max-height: none;
+    overflow: visible;
+  }
+  .kk-pv tr {
+    break-inside: avoid;
+  }
+  .kk-pv .kk-col-pkg {
+    display: table-cell !important;
+  }
+}
