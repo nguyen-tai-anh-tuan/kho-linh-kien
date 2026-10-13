@@ -28,13 +28,17 @@ async function loadCategories() {
   }
 }
 
-/** Danh sách dự án kèm số mã. Chưa chạy sql/10_project_codes.sql thì dự án chưa có mã. */
+/** Danh sách dự án kèm số mã và tiến độ */
 async function loadProjects() {
-  const full = await supabase.from('projects').select('id,name,description,code_no').order('name')
-  if (!full.error) return full.data
-  const plain = await supabase.from('projects').select('id,name,description').order('name')
-  if (plain.error) throw plain.error
-  return plain.data
+  // Thử lần lượt từ đầy đủ tới tối thiểu: database cũ hơn thì thiếu bớt cột (tiến độ: file 12, mã: file 10)
+  const variants = ['id,name,description,code_no,stage,stage_changed_at', 'id,name,description,code_no', 'id,name,description']
+  let last = null
+  for (const columns of variants) {
+    const res = await supabase.from('projects').select(columns).order('name')
+    if (!res.error) return res.data
+    last = res.error
+  }
+  throw last
 }
 
 /** Số mã 1, 2, 3... hiển thị thành PRJ-01, PRJ-02, PRJ-03... */

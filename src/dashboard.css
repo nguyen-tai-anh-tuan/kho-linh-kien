@@ -3246,3 +3246,135 @@ a.kk-prj:hover {
     display: table-cell !important;
   }
 }
+
+/* Tiến độ dự án */
+.kk-stage {
+  padding: 0 20px 14px;
+}
+.kk-pv .kk-stage {
+  padding: 0;
+  margin-bottom: 16px;
+}
+.kk-stage-steps {
+  display: flex;
+  margin: 0;
+  padding: 0 0 4px;
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+.kk-stage-step {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 96px;
+}
+/* Đường nối giữa hai bước */
+.kk-stage-step + .kk-stage-step::before {
+  content: '';
+  position: absolute;
+  top: 19px;
+  left: calc(-50% + 18px);
+  right: calc(50% + 18px);
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.kk-stage-step.is-past + .kk-stage-step::before,
+.kk-stage-step.is-now::before {
+  background: var(--primary);
+}
+.kk-stage-step.is-past + .kk-stage-step.is-next::before {
+  background: var(--border);
+}
+.kk-stage-step > button,
+.kk-stage-static {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  text-align: center;
+}
+.kk-stage-step > button:hover:not(:disabled) {
+  background: var(--kk-hover);
+}
+.kk-stage-step > button:disabled {
+  cursor: progress;
+}
+.kk-stage-dot {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--card);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.kk-stage-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--muted);
+}
+.is-past .kk-stage-dot {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+.is-now .kk-stage-dot {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+.is-now .kk-stage-name {
+  color: var(--text);
+  font-weight: 800;
+}
+.is-past .kk-stage-name {
+  color: var(--text);
+}
+.kk-stage-note {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.kk-stage-tag {
+  align-self: flex-start;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.6;
+  color: var(--kk-link);
+}
+.kk-stage-tag.is-done {
+  border-color: transparent;
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.kk-stage-filter {
+  margin-bottom: 8px;
+}
+.kk-stage-empty {
+  padding: 8px 12px;
+  font-size: 0.86rem;
+}
+@media (max-width: 720px) {
+  .kk-stage {
+    padding: 0 14px 12px;
+  }
+  .kk-stage-step {
+    min-width: 84px;
+  }
+}

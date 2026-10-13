@@ -23,6 +23,7 @@ import { fetchBomLines } from '../lib/bom'
 import { downloadCSV } from '../lib/csv'
 import { fmtDateTime, fmtMoneyFull, fmtNum, fmtPrice, normalize } from '../lib/format'
 import { ProjectGallery, useProjectImages } from './ProjectImages'
+import { StageBar } from './ProjectStage'
 
 const HISTORY_MAX = 50
 const TYPE_LABEL = { in: 'Trả về kho', out: 'Xuất kho', adjust: 'Điều chỉnh' }
@@ -212,6 +213,8 @@ export default function ProjectViewPage() {
           </button>
         </div>
       </div>
+
+      <StageBar project={project} />
 
       <ProjectGallery
         readOnly

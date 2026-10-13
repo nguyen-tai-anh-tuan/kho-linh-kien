@@ -15,6 +15,7 @@ import { downloadCSV } from '../lib/csv'
 import { fmtNum, normalize } from '../lib/format'
 import { removeProjectFiles } from '../lib/images'
 import { ProjectGallery, useProjectImages } from './ProjectImages'
+import { STAGES, StageBar, StageTag, hasStage } from './ProjectStage'
 
 const BOM_PAGE = 10 // số dòng BOM trên một trang
 
@@ -47,6 +48,7 @@ export default function ProjectsPage() {
   const [attempt, setAttempt] = useState(0)
   const [dialog, setDialog] = useState(null) // { kind: 'form' | 'delete', project }
   const images = useProjectImages(version)
+  const [stageFilter, setStageFilter] = useState('') // '' = mọi tiến độ
 
   useEffect(() => {
     let off = false
@@ -74,6 +76,9 @@ export default function ProjectsPage() {
   }, [lines])
 
   const selected = projects.find((p) => p.id === params.get('p')) ?? projects[0] ?? null
+
+  // Danh sách bên trái sau khi lọc theo tiến độ (dự án đang mở vẫn hiện ở khung phải)
+  const listed = stageFilter === '' ? projects : projects.filter((p) => p.stage === Number(stageFilter))
 
   function select(id) {
     setParams(
@@ -155,8 +160,24 @@ export default function ProjectsPage() {
       ) : (
         <div className="kk-split">
           <nav className="kk-card kk-tree-card" aria-label="Danh sách dự án">
+            {projects.some(hasStage) && (
+              <div className="kk-stage-filter">
+                <label htmlFor="prj-stage" className="kk-sr">
+                  Lọc theo tiến độ
+                </label>
+                <select id="prj-stage" value={stageFilter} onChange={(e) => setStageFilter(e.target.value)}>
+                  <option value="">Mọi tiến độ ({fmtNum(projects.length)})</option>
+                  {STAGES.map((name, i) => (
+                    <option key={name} value={i}>
+                      {name} ({fmtNum(projects.filter((p) => p.stage === i).length)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {listed.length === 0 && <p className="kk-muted-text kk-stage-empty">Không có dự án nào ở bước này.</p>}
             <ul className="kk-pick-list">
-              {projects.map((p) => {
+              {listed.map((p) => {
                 const own = linesByProject.get(p.id) ?? []
                 const short = analyse(own, 1, componentsById).filter((r) => r.short > 0).length
                 const on = selected?.id === p.id
@@ -182,6 +203,7 @@ export default function ProjectsPage() {
                           {p.code && <span className="kk-prj">{p.code}</span>}
                           {p.name}
                         </strong>
+                        <StageTag project={p} />
                         <small className={short > 0 ? 'kk-warn-text' : ''}>
                           {own.length === 0
                             ? 'Chưa có BOM'
@@ -434,6 +456,8 @@ function ProjectDetail({ project, lines, images, tracked, setBom, refetchBom, on
         )}
         </div>
       </div>
+
+      <StageBar project={project} editable={canEdit} />
 
       <ProjectGallery
         project={project}
