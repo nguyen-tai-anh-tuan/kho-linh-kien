@@ -5,6 +5,7 @@ import {
   Boxes,
   Cpu,
   FolderKanban,
+  FolderTree,
   History,
   KeyRound,
   LayoutDashboard,
@@ -33,6 +34,7 @@ import Overview from './pages/Overview'
 import ComponentsPage from './pages/Components'
 import ShoppingPage from './pages/Shopping'
 import LocationsPage from './pages/Locations'
+import CategoriesPage from './pages/Categories'
 import ProjectsPage from './pages/Projects'
 import ProjectViewPage from './pages/ProjectView'
 import HistoryPage from './pages/History'
@@ -56,6 +58,7 @@ function readCollapsed() {
 
 const MORE_PAGES = [
   { to: '/locations', label: 'Vị trí', Icon: MapPin },
+  { to: '/categories', label: 'Danh mục', Icon: FolderTree },
   { to: '/projects', label: 'Dự án và BOM', Icon: FolderKanban },
   { to: '/history', label: 'Lịch sử', Icon: History },
   { to: '/settings', label: 'Cài đặt', Icon: Settings },
@@ -329,6 +332,7 @@ function Shell({ session, profile, reloadProfile }) {
               <Route path="/components" element={<ComponentsPage />} />
               <Route path="/buy" element={<ShoppingPage />} />
               <Route path="/locations" element={<LocationsPage />} />
+              <Route path="/categories" element={<CategoriesPage />} />
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/projects/:id" element={<ProjectViewPage />} />
               <Route path="/history" element={<HistoryPage />} />

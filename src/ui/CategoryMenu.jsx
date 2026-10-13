@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronRight, LayoutGrid } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useData } from '../data/DataContext'
 
 /**
  * Menu danh mục hai cột: bên trái là danh mục lớn, bên phải là danh mục con
  * (kèm danh mục chi tiết) của mục đang chọn.
  * - onPick: có thì tên danh mục bấm được (dùng để lọc / chọn).
- * - actions(category): các nút đặt cạnh từng danh mục (dùng trong Cài đặt).
+ * - href(category): có thì tên danh mục là liên kết (dùng ở trang Danh mục để mở danh sách linh kiện).
+ * - actions(category): các nút đặt cạnh từng danh mục (dùng ở trang Danh mục).
  * - count(category): con số hiện cạnh tên.
  */
-export function CategoryMega({ value, onPick, rootLabel, actions, count, activeRoot, onActiveRoot, page = false }) {
+export function CategoryMega({ value, onPick, href, rootLabel, actions, count, activeRoot, onActiveRoot, page = false }) {
   const { categoriesById, categoryChildren, toneByCategory } = useData()
   const [inner, setInner] = useState(null)
   const timer = useRef(null)
@@ -38,6 +40,10 @@ export function CategoryMega({ value, onPick, rootLabel, actions, count, activeR
         <button type="button" className={`kk-mega-name ${value === c.id ? 'is-on' : ''}`} onClick={() => onPick(c)}>
           {c.name}
         </button>
+      ) : href ? (
+        <Link className="kk-mega-name kk-mega-link" to={href(c)} title={`Xem linh kiện trong ${c.name}`}>
+          {c.name}
+        </Link>
       ) : (
         <span className="kk-mega-name">{c.name}</span>
       )}
@@ -76,6 +82,10 @@ export function CategoryMega({ value, onPick, rootLabel, actions, count, activeR
               <button type="button" className={`kk-link ${value === root.id ? 'is-on' : ''}`} onClick={() => onPick(root)}>
                 {rootLabel ? rootLabel(root) : root.name}
               </button>
+            ) : href ? (
+              <Link className="kk-link" to={href(root)} title={`Xem mọi linh kiện trong ${root.name}`}>
+                {root.name}
+              </Link>
             ) : (
               <strong>{root.name}</strong>
             )}

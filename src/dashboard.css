@@ -3378,3 +3378,14 @@ a.kk-prj:hover {
     min-width: 84px;
   }
 }
+
+/* Trang Danh mục: tên danh mục là liên kết sang danh sách linh kiện */
+a.kk-mega-link {
+  color: inherit;
+  text-decoration: none;
+}
+a.kk-mega-link:hover {
+  background: var(--kk-hover);
+  color: var(--kk-link);
+  text-decoration: underline;
+}

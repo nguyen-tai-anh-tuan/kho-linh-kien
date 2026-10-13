@@ -5,7 +5,6 @@ import { useData } from '../data/DataContext'
 import { useShell } from '../ShellContext'
 import { EmptyState } from '../ui/common'
 import SettingsAccount from './SettingsAccount'
-import SettingsCategories from './SettingsCategories'
 import SettingsLevels from './SettingsLevels'
 import SettingsMembers from './SettingsMembers'
 
@@ -36,10 +35,10 @@ export default function SettingsPage() {
           <h1>Cài đặt</h1>
           <p>
             {isAdmin
-              ? 'Quản lý danh mục, mức cảnh báo sắp hết hàng và thành viên.'
+              ? 'Quản lý thành viên, mức cảnh báo sắp hết hàng và tài khoản của bạn.'
               : canEdit
-                ? 'Thêm danh mục, xem mức cảnh báo và quản lý tài khoản của bạn. Đổi tên, chuyển, xóa danh mục và đặt mức cảnh báo là việc của admin.'
-                : 'Xem danh mục, mức cảnh báo và quản lý tài khoản của bạn.'}
+                ? 'Xem mức cảnh báo và quản lý tài khoản của bạn. Đặt mức cảnh báo chung và theo danh mục là việc của admin.'
+                : 'Xem mức cảnh báo và quản lý tài khoản của bạn.'}
           </p>
         </div>
       </div>
@@ -54,8 +53,6 @@ export default function SettingsPage() {
         </p>
       )}
       {isAdmin && !profile.legacy && <SettingsMembers />}
-
-      <SettingsCategories />
 
       <SettingsLevels />
 

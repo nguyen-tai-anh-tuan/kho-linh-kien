@@ -377,7 +377,7 @@ export function CategoryPicker({ id, value, onChange, placeholder = 'Chưa phân
               )}
             </li>
           ))}
-          {results.length === (allowNone ? 1 : 0) && q && <li className="kk-combo-empty">Không có danh mục nào khớp. Bạn có thể thêm danh mục mới trong trang Cài đặt.</li>}
+          {results.length === (allowNone ? 1 : 0) && q && <li className="kk-combo-empty">Không có danh mục nào khớp. Bạn có thể thêm danh mục mới trong trang Danh mục.</li>}
         </ul>
       )}
     </div>

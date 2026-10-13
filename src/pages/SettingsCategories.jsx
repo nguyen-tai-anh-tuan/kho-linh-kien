@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { AlertTriangle, CornerDownRight, FolderPlus, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
@@ -17,7 +18,7 @@ const LEVELS = ['danh mục lớn', 'danh mục con', 'danh mục chi tiết']
 const MAX_DEPTH = LEVELS.length - 1
 const levelName = (depth) => LEVELS[Math.min(depth, MAX_DEPTH)]
 
-/** Mục "Danh mục linh kiện" của trang Cài đặt: cây ba tầng, admin thêm / đổi tên / chuyển / xóa */
+/** Khung cây danh mục của trang Danh mục: cây ba tầng, admin thêm / đổi tên / chuyển / xóa */
 export default function SettingsCategories() {
   const { components, categories, categoryChildren, categoryTree, loading, reload, createCategory } = useData()
   const { isAdmin, canEdit } = useShell()
@@ -136,7 +137,8 @@ export default function SettingsCategories() {
         <div>
           <h2 id="set-cat">Danh mục linh kiện</h2>
           <p className="kk-card-sub">
-            Ba tầng: danh mục lớn, danh mục con, danh mục chi tiết. Linh kiện gắn được vào bất kỳ tầng nào.
+            Ba tầng: danh mục lớn, danh mục con, danh mục chi tiết. Linh kiện gắn được vào bất kỳ tầng nào. Bấm vào tên danh mục
+            để xem linh kiện trong đó.
           </p>
         </div>
         {canEdit && (
@@ -171,6 +173,7 @@ export default function SettingsCategories() {
         <>
           <CategoryMega
             page
+            href={(c) => `/components?cat=${c.id}`}
             activeRoot={activeRoot}
             onActiveRoot={setActiveRoot}
             count={(c) => <span title={`${fmtNum(total.get(c.id) ?? 0)} linh kiện`}>{fmtNum(total.get(c.id) ?? 0)}</span>}
@@ -178,7 +181,16 @@ export default function SettingsCategories() {
           />
           <p className="kk-muted-text kk-cat-note">
             Con số cạnh mỗi danh mục là số linh kiện bên trong, tính cả các danh mục con.
-            {uncategorized > 0 && ` Còn ${fmtNum(uncategorized)} linh kiện chưa phân loại.`}
+            {uncategorized > 0 && (
+              <>
+                {' '}
+                Còn{' '}
+                <Link className="kk-link" to="/components?cat=none">
+                  {fmtNum(uncategorized)} linh kiện chưa phân loại
+                </Link>
+                .
+              </>
+            )}
           </p>
         </>
       )}
