@@ -3389,3 +3389,69 @@ a.kk-mega-link:hover {
   color: var(--kk-link);
   text-decoration: underline;
 }
+
+/* Trang Cần mua: hai thẻ và danh sách mua trước */
+.kk-seg.kk-seg-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+.kk-buy-tabs {
+  max-width: 560px;
+}
+.kk-plan-part {
+  font-weight: 700;
+}
+.kk-plan-badge {
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.kk-plan-badge.is-new {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--series-1) 16%, var(--card));
+  color: var(--series-1);
+}
+.kk-plan-note {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.kk-plan-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--kk-warn-line);
+  background: var(--kk-warn-bg);
+  color: var(--kk-warn);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.kk-plan-status.is-ordered {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--series-1) 16%, var(--card));
+  color: var(--series-1);
+}
+button.kk-plan-status:hover:not(:disabled) {
+  filter: brightness(0.96);
+  text-decoration: underline;
+}
+.kk-plan-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.kk-col-plan-act {
+  width: 1%;
+  white-space: nowrap;
+}
+.kk-receive-banner {
+  margin-bottom: 14px;
+}

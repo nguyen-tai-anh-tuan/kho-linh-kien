@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ArrowDownToLine, ChevronLeft, ChevronRight, ClipboardCopy, Download, Search } from 'lucide-react'
 import { useData } from '../data/DataContext'
+import PurchasePlan, { usePurchaseItems } from './PurchasePlan'
 import { useBuyList } from '../data/useBuyList'
 import { useTx } from '../TxContext'
 import { useShell } from '../ShellContext'
@@ -25,12 +26,14 @@ const PAGE_SIZE = 10
 
 /** Trang "Cần mua": mọi linh kiện đang hết hàng hoặc dưới mức tồn tối thiểu */
 export default function ShoppingPage() {
-  const { categoriesById, categoryChildren, toneByCategory, searchText, loading, refreshing, error, reload } = useData()
+  const { categoriesById, categoryChildren, toneByCategory, searchText, loading, refreshing, error, reload, version } = useData()
   const { openTx } = useTx()
   const { openComponent, canEdit } = useShell()
   const toast = useToast()
   const [params, setParams] = useSearchParams()
 
+  const tab = params.get('tab') === 'plan' ? 'plan' : 'auto' // 'auto' = theo tồn kho, 'plan' = danh sách mua trước
+  const planItems = usePurchaseItems(version)
   const q = params.get('q') ?? ''
   const kind = params.get('kind') ?? ''
   const cat = params.get('cat') ?? ''
@@ -109,6 +112,44 @@ export default function ShoppingPage() {
     }
   }
 
+  const tabs = (
+    <div className="kk-seg kk-seg-2 kk-buy-tabs" role="tablist" aria-label="Loại danh sách">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={tab === 'auto'}
+        className={`kk-seg-btn ${tab === 'auto' ? 'is-on' : ''}`}
+        onClick={() => setParams(new URLSearchParams(), { replace: true })}
+      >
+        Theo tồn kho ({fmtNum(toBuy.length)})
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={tab === 'plan'}
+        className={`kk-seg-btn ${tab === 'plan' ? 'is-on' : ''}`}
+        onClick={() => setParams(new URLSearchParams({ tab: 'plan' }), { replace: true })}
+      >
+        Danh sách mua trước{planItems.rows && !planItems.missing ? ` (${fmtNum(planItems.rows.length)})` : ''}
+      </button>
+    </div>
+  )
+
+  if (tab === 'plan') {
+    return (
+      <div className={`kk-page ${refreshing ? 'is-refreshing' : ''}`}>
+        <div className="kk-page-head">
+          <div>
+            <h1>Cần mua</h1>
+            <p>Lên trước những món định mua, kể cả linh kiện chưa có trong kho. Mua về thì bấm “Đã mua” để nhập kho.</p>
+          </div>
+        </div>
+        {tabs}
+        <PurchasePlan items={planItems} />
+      </div>
+    )
+  }
+
   if (error) {
     return (
       <EmptyState title="Chưa tải được danh sách cần mua" text={error}>
@@ -143,6 +184,8 @@ export default function ShoppingPage() {
           </button>
         </div>
       </div>
+
+      {tabs}
 
       <div className="kk-card kk-toolbar">
         <div className="kk-search kk-search-page">
