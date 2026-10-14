@@ -121,7 +121,8 @@ export default function ShoppingPage() {
         className={`kk-seg-btn ${tab === 'auto' ? 'is-on' : ''}`}
         onClick={() => setParams(new URLSearchParams(), { replace: true })}
       >
-        Theo tồn kho ({fmtNum(toBuy.length)})
+        Theo tồn kho
+        {toBuy.length > 0 && <span className="kk-badge">{fmtNum(toBuy.length)}</span>}
       </button>
       <button
         type="button"
@@ -130,7 +131,8 @@ export default function ShoppingPage() {
         className={`kk-seg-btn ${tab === 'plan' ? 'is-on' : ''}`}
         onClick={() => setParams(new URLSearchParams({ tab: 'plan' }), { replace: true })}
       >
-        Danh sách mua trước{planItems.rows && !planItems.missing ? ` (${fmtNum(planItems.rows.length)})` : ''}
+        Danh sách mua trước
+        {planItems.rows?.length > 0 && <span className="kk-badge kk-badge-plan">{fmtNum(planItems.rows.length)}</span>}
       </button>
     </div>
   )

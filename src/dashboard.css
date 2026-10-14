@@ -3455,3 +3455,34 @@ button.kk-plan-status:hover:not(:disabled) {
 .kk-receive-banner {
   margin-bottom: 14px;
 }
+
+/* Hai con số cạnh "Cần mua": vàng = theo tồn kho, xanh = danh sách mua trước */
+.kk-badges {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.kk-badges .kk-badge {
+  margin-left: 0;
+}
+.kk-badge-plan {
+  background: #8fc2ff;
+  color: #0b2a52;
+}
+[data-theme='dark'] .kk-badge-plan {
+  background: #5aa2f5;
+  color: #04172f;
+}
+.kk[data-collapsed='true'] .kk-badges {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  flex-direction: column;
+  gap: 2px;
+}
+.kk[data-collapsed='true'] .kk-badges .kk-badge {
+  position: static;
+}
+.kk-buy-tabs .kk-badge {
+  margin-left: 0;
+}

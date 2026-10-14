@@ -26,6 +26,7 @@ import useTheme from './useTheme'
 import { APP_VERSION } from './version'
 import { DataProvider, useData } from './data/DataContext'
 import { useBuyList } from './data/useBuyList'
+import { usePurchaseItems } from './pages/PurchasePlan'
 import { ToastProvider } from './ui/Toast'
 import { TxProvider, useTx } from './TxContext'
 import { ShellContext } from './ShellContext'
@@ -97,6 +98,11 @@ function Shell({ session, profile, reloadProfile }) {
   const q = params.get('q') ?? ''
   // Đếm đúng số dòng của trang Cần mua. Đổi trang thì tính lại, vì BOM có thể vừa được sửa.
   const attention = useBuyList(location.pathname).toBuy.length
+  // Số món trong danh sách mua trước (thẻ thứ hai của trang Cần mua)
+  const planned = usePurchaseItems(`${version}|${location.pathname}`).rows?.length ?? 0
+  const buyBadges = (
+    <BuyBadges auto={attention} plan={planned} />
+  )
   const email = session?.user?.email ?? ''
   const displayName = profile.display_name || email
   const mayEdit = canEdit(profile.role)
@@ -224,11 +230,7 @@ function Shell({ session, profile, reloadProfile }) {
             <NavLink to="/buy" title="Cần mua">
               <ShoppingCart size={20} />
               <span className="kk-side-text">Cần mua</span>
-              {attention > 0 && (
-                <span className="kk-badge" aria-label={`${attention} món hết hàng hoặc sắp hết`}>
-                  {attention}
-                </span>
-              )}
+              {buyBadges}
             </NavLink>
             {mayEdit && (
               <button type="button" onClick={() => openTx({ type: 'in' })} title="Nhập / xuất kho (phím N)">
@@ -363,7 +365,7 @@ function Shell({ session, profile, reloadProfile }) {
           <button type="button" className={onSheetPage ? 'active' : ''} aria-haspopup="dialog" onClick={() => setMenuOpen(true)}>
             <Menu size={22} />
             <span>Khác</span>
-            {attention > 0 && <i className="kk-tab-dot" aria-label={`${attention} món cần mua`} />}
+            {attention + planned > 0 && <i className="kk-tab-dot" aria-label={`${attention + planned} món cần mua`} />}
           </button>
         </nav>
       </div>
@@ -375,7 +377,7 @@ function Shell({ session, profile, reloadProfile }) {
               <NavLink key={to} to={to} onClick={() => setMenuOpen(false)}>
                 <Icon size={20} />
                 {label}
-                {to === '/buy' && attention > 0 && <span className="kk-badge">{attention}</span>}
+                {to === '/buy' && buyBadges}
               </NavLink>
             ))}
             <Link to="/settings#account" onClick={() => setMenuOpen(false)}>
@@ -407,5 +409,28 @@ function Shell({ session, profile, reloadProfile }) {
       )}
       {importing && <ImportCsvModal onClose={() => setImporting(false)} />}
     </ShellContext.Provider>
+  )
+}
+
+/** Hai con số của trang Cần mua: vàng = theo tồn kho, xanh = danh sách mua trước */
+export function BuyBadges({ auto, plan }) {
+  if (auto <= 0 && plan <= 0) return null
+  return (
+    <span className="kk-badges">
+      {auto > 0 && (
+        <span className="kk-badge" title={`${auto} món cần mua theo tồn kho`} aria-label={`${auto} món cần mua theo tồn kho`}>
+          {auto}
+        </span>
+      )}
+      {plan > 0 && (
+        <span
+          className="kk-badge kk-badge-plan"
+          title={`${plan} món trong danh sách mua trước`}
+          aria-label={`${plan} món trong danh sách mua trước`}
+        >
+          {plan}
+        </span>
+      )}
+    </span>
   )
 }
