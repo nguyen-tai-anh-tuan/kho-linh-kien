@@ -369,7 +369,7 @@ export default function ShoppingPage() {
         ) : (
           <>
             <div className="kk-table-scroll">
-              <table className="kk-table">
+              <table className="kk-table kk-buy-table">
                 <thead>
                   <tr>
                     {canPlan && (
@@ -520,12 +520,12 @@ export default function ShoppingPage() {
                           )}
                           <button
                             type="button"
-                            className="kk-btn kk-btn-soft kk-btn-sm"
-                            title="Mua về rồi thì bấm để nhập kho"
+                            className="kk-btn kk-btn-soft kk-btn-sm kk-buy-in"
+                            title="Nhập kho (mua về rồi thì bấm)"
+                            aria-label={`Nhập kho ${c.part_number}`}
                             onClick={() => openTx({ type: 'in', componentId: c.id })}
                           >
                             <ArrowDownToLine size={16} />
-                            Nhập
                           </button>
                           </span>
                         </td>

@@ -2873,6 +2873,33 @@ button.kk-mega-name:hover {
 a.kk-plan-status {
   text-decoration: none;
 }
+/* Bảng "Theo tồn kho" nhiều cột: thu gọn để vừa màn hình, không phải kéo ngang */
+.kk-buy-in {
+  width: 34px;
+  padding: 0;
+  justify-content: center;
+}
+@media (min-width: 721px) {
+  .kk-buy-table th,
+  .kk-buy-table td {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .kk-buy-table .kk-stock {
+    gap: 6px;
+  }
+  .kk-buy-table .kk-stock-num {
+    min-width: 24px;
+  }
+  .kk-buy-table .kk-stock-bar {
+    width: 56px;
+  }
+  .kk-buy-table .kk-buy-state {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
 a.kk-plan-status:hover {
   filter: brightness(0.96);
   text-decoration: underline;
