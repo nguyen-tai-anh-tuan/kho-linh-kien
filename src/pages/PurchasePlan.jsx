@@ -420,23 +420,25 @@ export default function PurchasePlan({ items }) {
 /* ------------------------------------------------------------------ */
 const text = (v) => (v === null || v === undefined ? '' : String(v))
 
-function PlanForm({ initial, onSaved, onClose }) {
+/** initial = sửa một món đã có; preset = thêm mới nhưng điền sẵn (vd từ thẻ "Theo tồn kho") */
+export function PlanForm({ initial, preset, onSaved, onClose }) {
   const { allComponents, projects } = useData()
   const toast = useToast()
-  const [mode, setMode] = useState(initial?.component_id ? 'stock' : 'new') // 'stock' = linh kiện đã có trong kho
+  const seed = initial ?? preset
+  const [mode, setMode] = useState(seed?.component_id ? 'stock' : 'new') // 'stock' = linh kiện đã có trong kho
   const [f, setF] = useState({
-    component_id: initial?.component_id ?? null,
-    part_number: text(initial?.part_number),
-    name: text(initial?.name),
-    category_id: initial?.category_id ?? null,
-    value: text(initial?.value),
-    package: text(initial?.package),
-    manufacturer: text(initial?.manufacturer),
-    quantity: initial?.quantity ?? 1,
-    unit_price: text(initial?.unit_price),
-    shop_url: text(initial?.shop_url),
-    note: text(initial?.note),
-    project_id: initial?.project_id ?? null,
+    component_id: seed?.component_id ?? null,
+    part_number: text(seed?.part_number),
+    name: text(seed?.name),
+    category_id: seed?.category_id ?? null,
+    value: text(seed?.value),
+    package: text(seed?.package),
+    manufacturer: text(seed?.manufacturer),
+    quantity: seed?.quantity ?? 1,
+    unit_price: text(seed?.unit_price),
+    shop_url: text(seed?.shop_url),
+    note: text(seed?.note),
+    project_id: seed?.project_id ?? null,
   })
   const [errors, setErrors] = useState({})
   const [formError, setFormError] = useState('')

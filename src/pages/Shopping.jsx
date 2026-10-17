@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowDownToLine, ChevronLeft, ChevronRight, ClipboardCopy, Download, Search } from 'lucide-react'
+import { ArrowDownToLine, ChevronLeft, ChevronRight, ClipboardCopy, Download, ListPlus, Loader2, Search, Truck, X } from 'lucide-react'
+import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
-import PurchasePlan, { usePurchaseItems } from './PurchasePlan'
+import PurchasePlan, { PlanForm, usePurchaseItems } from './PurchasePlan'
 import { useBuyList } from '../data/useBuyList'
 import { useTx } from '../TxContext'
 import { useShell } from '../ShellContext'
 import { useToast } from '../ui/Toast'
 import { CategoryChip, EmptyState, Skeleton, StatusChip, StockBar } from '../ui/common'
 import { CategoryFilter } from '../ui/CategoryMenu'
+import { friendlyError, mustChange } from '../lib/api'
 import { downloadCSV } from '../lib/csv'
 import { fmtMoneyFull, fmtNum, fmtPrice, normalize } from '../lib/format'
 import { subtreeIds } from '../lib/tree'
@@ -37,7 +39,11 @@ export default function ShoppingPage() {
   const q = params.get('q') ?? ''
   const kind = params.get('kind') ?? ''
   const cat = params.get('cat') ?? ''
-  const hasFilter = Boolean(q || kind || cat)
+  const unplannedOnly = params.get('plan') === 'no'
+  const hasFilter = Boolean(q || kind || cat || unplannedOnly)
+  const [selected, setSelected] = useState(() => new Set())
+  const [planDialog, setPlanDialog] = useState(null) // món điền sẵn cho form "Thêm món cần mua"
+  const [adding, setAdding] = useState(false)
 
   function setParam(key, value) {
     setParams(
@@ -58,11 +64,69 @@ export default function ShoppingPage() {
   const lowCount = toBuy.filter((c) => c.status === 'low').length
   const bomCount = toBuy.filter((c) => bomShort(c) > 0).length
 
+  // Linh kiện đã nằm trong danh sách mua trước: để không lên danh sách (và đặt mua) hai lần
+  const planReady = planItems.rows !== null && !planItems.missing && !planItems.error
+  const planned = useMemo(() => {
+    const map = new Map()
+    for (const it of planItems.rows ?? []) {
+      if (!it.component_id) continue
+      const p = map.get(it.component_id) ?? { quantity: 0, ordered: true }
+      p.quantity += it.quantity
+      p.ordered = p.ordered && it.status === 'ordered'
+      map.set(it.component_id, p)
+    }
+    return map
+  }, [planItems.rows])
+  const canPlan = canEdit && planReady
+  const unplannedCount = toBuy.filter((c) => !planned.has(c.id)).length
+  const outUnplanned = toBuy.filter((c) => c.status === 'out' && !planned.has(c.id))
+
+  /** Điền sẵn một món: số "Nên mua", và dự án nếu chỉ thiếu cho đúng một dự án */
+  function presetOf(c) {
+    const bom = bomByComponent.get(c.id)
+    return {
+      component_id: c.id,
+      quantity: need(c),
+      project_id: bom?.short > 0 && bom.uses.length === 1 ? bom.uses[0].project.id : null,
+    }
+  }
+
+  async function addToPlan(list) {
+    const fresh = list.filter((c) => !planned.has(c.id))
+    if (adding || fresh.length === 0) return
+    setAdding(true)
+    try {
+      const data = mustChange(await supabase.from('purchase_items').insert(fresh.map(presetOf)).select('id'))
+      const ids = data.map((r) => r.id)
+      planItems.refresh()
+      setSelected(new Set())
+      toast.push({
+        duration: 9000,
+        message: `Đã thêm ${fmtNum(fresh.length)} món vào danh sách mua trước${fresh.length < list.length ? ` (bỏ qua ${fmtNum(list.length - fresh.length)} món đã có sẵn)` : ''}.`,
+        action: ids.length
+          ? {
+              label: 'Hoàn tác',
+              onClick: async () => {
+                const { error: err } = await supabase.from('purchase_items').delete().in('id', ids)
+                planItems.refresh()
+                if (err) toast.push({ tone: 'error', message: friendlyError(err), duration: 9000 })
+              },
+            }
+          : undefined,
+      })
+    } catch (e) {
+      toast.push({ tone: 'error', message: friendlyError(e), duration: 9000 })
+    } finally {
+      setAdding(false)
+    }
+  }
+
   const rows = useMemo(() => {
     const terms = normalize(q).split(/\s+/).filter(Boolean)
     const catIds = cat && cat !== 'none' ? new Set(subtreeIds(categoryChildren, cat)) : null
     return toBuy.filter((c) => {
       if (kind === 'bom' ? !((bomByComponent.get(c.id)?.short ?? 0) > 0) : kind && c.status !== kind) return false
+      if (unplannedOnly && planned.has(c.id)) return false
       if (cat === 'none' && c.category_id) return false
       if (catIds && !catIds.has(c.category_id)) return false
       if (terms.length) {
@@ -71,15 +135,37 @@ export default function ShoppingPage() {
       }
       return true
     })
-  }, [toBuy, bomByComponent, searchText, categoryChildren, q, kind, cat])
+  }, [toBuy, bomByComponent, searchText, categoryChildren, planned, q, kind, cat, unplannedOnly])
 
   // Chia trang; chép danh sách, xuất CSV và ước tính chi phí vẫn tính trên toàn bộ danh sách đang lọc
   const [paging, setPaging] = useState({ key: '', page: 0 })
-  const pagingKey = `${q}|${kind}|${cat}`
+  const pagingKey = `${q}|${kind}|${cat}|${unplannedOnly}`
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
   const page = Math.min(paging.key === pagingKey ? paging.page : 0, pageCount - 1)
   const pageRows = rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
   const goTo = (n) => setPaging({ key: pagingKey, page: n })
+
+  // Chỉ chọn được món chưa lên danh sách mua trước
+  const selectable = pageRows.filter((c) => !planned.has(c.id))
+  const chosen = toBuy.filter((c) => selected.has(c.id) && !planned.has(c.id))
+  const allOnPage = selectable.length > 0 && selectable.every((c) => selected.has(c.id))
+  const someOnPage = selectable.some((c) => selected.has(c.id))
+  function toggleAll() {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (allOnPage) selectable.forEach((c) => next.delete(c.id))
+      else selectable.forEach((c) => next.add(c.id))
+      return next
+    })
+  }
+  function toggleOne(id) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   const priced = rows.filter((c) => Number(c.unit_price) > 0)
   const cost = priced.reduce((sum, c) => sum + need(c) * Number(c.unit_price), 0)
@@ -122,7 +208,11 @@ export default function ShoppingPage() {
         onClick={() => setParams(new URLSearchParams(), { replace: true })}
       >
         Theo tồn kho
-        {toBuy.length > 0 && <span className="kk-badge">{fmtNum(toBuy.length)}</span>}
+        {(planReady ? unplannedCount : toBuy.length) > 0 && (
+          <span className="kk-badge" title={planReady ? 'Số mã cần mua chưa lên danh sách mua trước' : undefined}>
+            {fmtNum(planReady ? unplannedCount : toBuy.length)}
+          </span>
+        )}
       </button>
       <button
         type="button"
@@ -172,10 +262,22 @@ export default function ShoppingPage() {
               ? 'Đang tải…'
               : toBuy.length === 0
                 ? 'Kho đang đủ hàng.'
-                : `${fmtNum(toBuy.length)} mã cần mua: ${fmtNum(outCount)} hết hàng, ${fmtNum(lowCount)} sắp hết, ${fmtNum(bomCount)} thiếu cho dự án`}
+                : `${fmtNum(toBuy.length)} mã cần mua: ${fmtNum(outCount)} hết hàng, ${fmtNum(lowCount)} sắp hết, ${fmtNum(bomCount)} thiếu cho dự án${planReady && unplannedCount < toBuy.length ? `. Còn ${fmtNum(unplannedCount)} mã chưa lên danh sách mua trước` : ''}`}
           </p>
         </div>
         <div className="kk-quick">
+          {canPlan && outUnplanned.length > 0 && (
+            <button
+              type="button"
+              className="kk-btn kk-btn-primary"
+              disabled={adding}
+              title="Đưa mọi món hết hàng chưa có trong danh sách mua trước vào danh sách đó"
+              onClick={() => addToPlan(outUnplanned)}
+            >
+              {adding ? <Loader2 size={18} className="kk-spin" /> : <ListPlus size={18} />}
+              Lên DS {fmtNum(outUnplanned.length)} món hết hàng
+            </button>
+          )}
           <button type="button" className="kk-btn kk-btn-outline" onClick={copyList} disabled={rows.length === 0}>
             <ClipboardCopy size={18} />
             Chép danh sách
@@ -213,6 +315,17 @@ export default function ShoppingPage() {
             </button>
           ))}
         </div>
+        {planReady && (
+          <button
+            type="button"
+            className={`kk-pill ${unplannedOnly ? 'is-on' : ''}`}
+            aria-pressed={unplannedOnly}
+            title="Chỉ hiện món chưa có trong danh sách mua trước"
+            onClick={() => setParam('plan', unplannedOnly ? '' : 'no')}
+          >
+            Chưa lên DS ({fmtNum(unplannedCount)})
+          </button>
+        )}
         <CategoryFilter value={cat} onChange={(id) => setParam('cat', id)} />
         {hasFilter && (
           <button type="button" className="kk-link" onClick={() => setParams(new URLSearchParams(), { replace: true })}>
@@ -220,6 +333,20 @@ export default function ShoppingPage() {
           </button>
         )}
       </div>
+
+      {canPlan && chosen.length > 0 && (
+        <div className="kk-bulk" role="region" aria-label="Thao tác với mục đã chọn">
+          <strong>Đã chọn {fmtNum(chosen.length)}</strong>
+          <button type="button" className="kk-btn kk-btn-primary kk-btn-sm" disabled={adding} onClick={() => addToPlan(chosen)}>
+            {adding ? <Loader2 size={16} className="kk-spin" /> : <ListPlus size={16} />}
+            Thêm vào danh sách mua trước
+          </button>
+          <button type="button" className="kk-btn kk-btn-ghost kk-btn-sm" onClick={() => setSelected(new Set())}>
+            <X size={16} />
+            Bỏ chọn
+          </button>
+        </div>
+      )}
 
       <div className="kk-card kk-table-card">
         {loading ? (
@@ -245,6 +372,20 @@ export default function ShoppingPage() {
               <table className="kk-table">
                 <thead>
                   <tr>
+                    {canPlan && (
+                      <th className="kk-col-check">
+                        <input
+                          type="checkbox"
+                          aria-label="Chọn tất cả món chưa lên danh sách trên trang này"
+                          checked={allOnPage}
+                          disabled={selectable.length === 0}
+                          ref={(el) => {
+                            if (el) el.indeterminate = !allOnPage && someOnPage
+                          }}
+                          onChange={toggleAll}
+                        />
+                      </th>
+                    )}
                     <th>Linh kiện</th>
                     <th className="kk-col-pkg">Package</th>
                     <th>Tồn kho</th>
@@ -259,8 +400,20 @@ export default function ShoppingPage() {
                 <tbody>
                   {pageRows.map((c) => {
                     const bom = bomByComponent.get(c.id)
+                    const plan = planned.get(c.id)
                     return (
-                    <tr key={c.id} onClick={() => openComponent(c.id)}>
+                    <tr key={c.id} className={selected.has(c.id) && !plan ? 'is-selected' : ''} onClick={() => openComponent(c.id)}>
+                      {canPlan && (
+                        <td className="kk-col-check" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            aria-label={plan ? `${c.part_number} đã có trong danh sách mua trước` : `Chọn ${c.part_number}`}
+                            checked={selected.has(c.id) && !plan}
+                            disabled={Boolean(plan)}
+                            onChange={() => toggleOne(c.id)}
+                          />
+                        </td>
+                      )}
                       <td data-label="Linh kiện" className="kk-cell-main">
                         <button
                           type="button"
@@ -336,10 +489,35 @@ export default function ShoppingPage() {
                         {Number(c.unit_price) > 0 ? fmtMoneyFull(need(c) * Number(c.unit_price)) : '—'}
                       </td>
                       <td data-label="Trạng thái">
-                        <StatusChip status={c.status} />
+                        <span className="kk-buy-state">
+                          <StatusChip status={c.status} />
+                          {plan && (
+                            <Link
+                              className={`kk-plan-status ${plan.ordered ? 'is-ordered' : 'is-todo'}`}
+                              to="/buy?tab=plan"
+                              title={`Đã có trong danh sách mua trước: ${fmtNum(plan.quantity)}. Bấm để xem.`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {plan.ordered && <Truck size={13} />}
+                              {plan.ordered ? 'Đã đặt' : 'Đã lên DS'} ×{fmtNum(plan.quantity)}
+                            </Link>
+                          )}
+                        </span>
                       </td>
                       {canEdit && (
                         <td className="kk-col-buy" onClick={(e) => e.stopPropagation()}>
+                          <span className="kk-plan-actions">
+                          {canPlan && !plan && (
+                            <button
+                              type="button"
+                              className="kk-btn kk-btn-outline kk-btn-sm"
+                              title="Thêm vào danh sách mua trước (sửa được số lượng, link shop, dự án)"
+                              onClick={() => setPlanDialog(presetOf(c))}
+                            >
+                              <ListPlus size={16} />
+                              Lên DS
+                            </button>
+                          )}
                           <button
                             type="button"
                             className="kk-btn kk-btn-soft kk-btn-sm"
@@ -349,6 +527,7 @@ export default function ShoppingPage() {
                             <ArrowDownToLine size={16} />
                             Nhập
                           </button>
+                          </span>
                         </td>
                       )}
                     </tr>
@@ -401,6 +580,8 @@ export default function ShoppingPage() {
           </>
         )}
       </div>
+
+      {planDialog && <PlanForm preset={planDialog} onSaved={planItems.refresh} onClose={() => setPlanDialog(null)} />}
     </div>
   )
 }

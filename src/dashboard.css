@@ -2856,8 +2856,26 @@ button.kk-mega-name:hover {
   margin-left: 0;
 }
 .kk-col-buy {
-  width: 96px;
+  width: 1%;
+  white-space: nowrap;
   text-align: right;
+}
+.kk-col-buy .kk-plan-actions {
+  gap: 6px;
+}
+/* Tình trạng kho + nhãn "Đã lên DS" / "Đã đặt" của danh sách mua trước */
+.kk-buy-state {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+a.kk-plan-status {
+  text-decoration: none;
+}
+a.kk-plan-status:hover {
+  filter: brightness(0.96);
+  text-decoration: underline;
 }
 .kk-tabbar > button:not(.kk-fab) {
   position: relative;
