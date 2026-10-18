@@ -623,6 +623,38 @@
 .kk-stat-link:hover {
   border-color: var(--kk-warn);
 }
+button.kk-stat {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.kk-stat:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.kk-stats.kk-stats-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+/* Bao nhiêu mã đã có đơn giá (thẻ Giá trị kho) */
+.kk-stat-meter {
+  display: block;
+  height: 6px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--kk-soft);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.kk-stat-meter i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--kk-gold);
+}
+.kk-stat-meter.is-full i {
+  background: var(--ok);
+}
 
 /* Biểu đồ */
 .kk-grid-charts {
@@ -1895,6 +1927,12 @@
 @media (max-width: 720px) {
   .kk-stats {
     gap: 12px;
+  }
+  .kk-stats.kk-stats-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .kk-stats-3 > :last-child {
+    grid-column: 1 / -1;
   }
   .kk-stat {
     padding: 14px;

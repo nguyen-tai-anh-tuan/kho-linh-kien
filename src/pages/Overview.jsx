@@ -5,9 +5,6 @@ import {
   AlertTriangle,
   ArrowDownToLine,
   ArrowUpFromLine,
-  Boxes,
-  Coins,
-  Layers,
   PackagePlus,
   SlidersHorizontal,
   ShoppingCart,
@@ -19,7 +16,8 @@ import { useTx } from '../TxContext'
 import { useShell } from '../ShellContext'
 import { EmptyState, Skeleton, TraceLoader } from '../ui/common'
 import { friendlyError } from '../lib/api'
-import { fmtDay, fmtMoney, fmtMoneyFull, fmtNum, greeting, timeAgo } from '../lib/format'
+import { fmtDay, fmtNum, greeting, timeAgo } from '../lib/format'
+import { StatCard, StockStatCards, stockStats } from '../ui/stats'
 
 // Hai danh sách ở cuối trang hiện tối đa chừng này dòng, trong một khung cuộn cao cố định
 const RECENT_MAX = 30
@@ -31,19 +29,13 @@ export default function Overview() {
 
   /* ---- số liệu tổng hợp ---- */
   const stats = useMemo(() => {
-    let qty = 0
-    let value = 0
     let attention = 0
     let out = 0
-    let hasPrice = false
     for (const c of components) {
-      qty += c.total_quantity
-      value += Number(c.stock_value) || 0
-      if (Number(c.unit_price) > 0) hasPrice = true
       if (c.status === 'low' || c.status === 'out') attention++
       if (c.status === 'out') out++
     }
-    return { types: components.length, qty, value, hasPrice, attention, out }
+    return { ...stockStats(components), attention, out }
   }, [components])
 
   // Cùng một danh sách với trang Cần mua: hết hàng, dưới mức tối thiểu, hoặc thiếu cho BOM của dự án
@@ -152,15 +144,7 @@ export default function Overview() {
       </div>
 
       <section className="kk-stats" aria-label="Số liệu tổng quan">
-        <StatCard Icon={Boxes} label="Loại linh kiện" value={fmtNum(stats.types)} note="mã đang quản lý" />
-        <StatCard Icon={Layers} label="Tổng số lượng" value={fmtNum(stats.qty)} note="cái trong kho" />
-        <StatCard
-          Icon={Coins}
-          label="Giá trị kho"
-          value={stats.hasPrice ? fmtMoney(stats.value) : '—'}
-          title={stats.hasPrice ? fmtMoneyFull(stats.value) : undefined}
-          note={stats.hasPrice ? 'theo đơn giá đã nhập' : 'Điền đơn giá để tính'}
-        />
+        <StockStatCards stats={stats} missingTo="/components?price=none" />
         <StatCard
           Icon={AlertTriangle}
           tone={stats.attention > 0 ? 'warn' : 'good'}
@@ -292,28 +276,6 @@ export default function Overview() {
 }
 
 /* ------------------------------------------------------------------ */
-
-function StatCard({ Icon, label, value, note, tone = 'neutral', to, title }) {
-  const inner = (
-    <>
-      <span className={`kk-stat-ico kk-stat-ico-${tone}`}>
-        <Icon size={20} />
-      </span>
-      <span className="kk-stat-label">{label}</span>
-      <strong className="kk-stat-value" title={title}>
-        {value}
-      </strong>
-      <span className="kk-stat-note">{note}</span>
-    </>
-  )
-  return to ? (
-    <Link to={to} className={`kk-stat kk-stat-link kk-stat-${tone}`}>
-      {inner}
-    </Link>
-  ) : (
-    <div className={`kk-stat kk-stat-${tone}`}>{inner}</div>
-  )
-}
 
 function ChartCard({ title, summary, children, loading, error, isEmpty, emptyText, tableColumns, tableRows }) {
   const [view, setView] = useState('chart')

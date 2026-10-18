@@ -18,7 +18,8 @@ import { useTx } from '../TxContext'
 import { useShell } from '../ShellContext'
 import { CategoryChip, EmptyState, Skeleton, StatusChip, StockBar } from '../ui/common'
 import { downloadCSV } from '../lib/csv'
-import { fmtNum, fmtPrice, normalize } from '../lib/format'
+import { fmtMoneyFull, fmtNum, fmtPrice, normalize } from '../lib/format'
+import { StockStatCards, stockStats } from '../ui/stats'
 import { CategoryFilter } from '../ui/CategoryMenu'
 import { subtreeIds } from '../lib/tree'
 
@@ -31,6 +32,7 @@ const COLUMNS = [
   { key: 'locations', title: 'Vị trí', cls: 'kk-col-loc' },
   { key: 'total_quantity', title: 'Tồn kho', sortable: true },
   { key: 'unit_price', title: 'Đơn giá', sortable: true, cls: 'kk-col-price', num: true },
+  { key: 'stock_value', title: 'Giá trị', sortable: true, cls: 'kk-col-price', num: true },
   { key: 'status', title: 'Trạng thái', sortable: true },
 ]
 
@@ -62,8 +64,9 @@ export default function ComponentsPage() {
   const pkg = params.get('pkg') ?? ''
   const loc = params.get('loc') ?? ''
   const low = params.get('low') === '1'
+  const noPrice = params.get('price') === 'none' // chỉ hiện mã chưa có đơn giá
   const arc = params.get('arc') === '1' // đang xem các linh kiện ngừng dùng
-  const hasFilter = Boolean(q || cat || pkg || loc || low)
+  const hasFilter = Boolean(q || cat || pkg || loc || low || noPrice)
   const components = arc ? archivedComponents : active
 
   function setParam(key, value) {
@@ -99,13 +102,24 @@ export default function ComponentsPage() {
       if (pkg && c.package !== pkg) return false
       if (loc && !(stockByComponent.get(c.id) ?? []).some((s) => s.location_id === loc)) return false
       if (low && c.status === 'ok') return false
+      if (noPrice && Number(c.unit_price) > 0) return false
       return true
     })
-  }, [components, searchText, stockByComponent, categoryChildren, q, cat, pkg, loc, low])
+  }, [components, searchText, stockByComponent, categoryChildren, q, cat, pkg, loc, low, noPrice])
+
+  // Số liệu tính theo đúng danh sách đang lọc
+  const stats = useMemo(() => stockStats(filtered), [filtered])
 
   const sorted = useMemo(() => {
     const dir = sort.dir === 'asc' ? 1 : -1
-    const get = (c) => (sort.key === 'status' ? STATUS_ORDER[c.status] : c[sort.key])
+    const get = (c) =>
+      sort.key === 'status'
+        ? STATUS_ORDER[c.status]
+        : sort.key === 'stock_value'
+          ? Number(c.unit_price) > 0
+            ? Number(c.stock_value) || 0
+            : null
+          : c[sort.key]
     return [...filtered].sort((a, b) => {
       const x = get(a)
       const y = get(b)
@@ -114,7 +128,7 @@ export default function ComponentsPage() {
       if (xe && ye) return 0
       if (xe) return 1 // ô trống luôn nằm cuối
       if (ye) return -1
-      if (typeof x === 'number' || sort.key === 'unit_price') return (Number(x) - Number(y)) * dir
+      if (typeof x === 'number' || sort.key === 'unit_price' || sort.key === 'stock_value') return (Number(x) - Number(y)) * dir
       return String(x).localeCompare(String(y), 'vi', { numeric: true }) * dir
     })
   }, [filtered, sort])
@@ -162,6 +176,7 @@ export default function ComponentsPage() {
       'min_stock',
       'unit_price',
       'total_quantity',
+      'stock_value',
       'locations',
       'datasheet_url',
       'notes',
@@ -176,6 +191,7 @@ export default function ComponentsPage() {
       c.min_stock,
       c.unit_price,
       c.total_quantity,
+      Number(c.unit_price) > 0 ? c.stock_value : '',
       (stockByComponent.get(c.id) ?? []).map((s) => `${s.path}: ${s.quantity}`).join('; '),
       c.datasheet_url,
       c.notes,
@@ -227,6 +243,16 @@ export default function ComponentsPage() {
         </div>
       </div>
 
+      {!loading && components.length > 0 && (
+        <section className="kk-stats kk-stats-3" aria-label="Số liệu linh kiện">
+          <StockStatCards
+            stats={stats}
+            scope={arc ? 'ngừng dùng' : hasFilter ? 'theo bộ lọc' : undefined}
+            onMissing={noPrice ? undefined : () => setParam('price', 'none')}
+          />
+        </section>
+      )}
+
       <div className="kk-card kk-toolbar">
         <div className="kk-search kk-search-page">
           <Search size={18} aria-hidden="true" />
@@ -260,6 +286,11 @@ export default function ComponentsPage() {
           <input type="checkbox" checked={low} onChange={(e) => setParam('low', e.target.checked ? '1' : '')} />
           <span className="kk-switch-track" aria-hidden="true" />
           Chỉ hiện sắp hết
+        </label>
+        <label className="kk-switch">
+          <input type="checkbox" checked={noPrice} onChange={(e) => setParam('price', e.target.checked ? 'none' : '')} />
+          <span className="kk-switch-track" aria-hidden="true" />
+          Chưa có đơn giá
         </label>
         {(arc || archivedComponents.length > 0) && (
           <label className="kk-switch">
@@ -432,6 +463,9 @@ export default function ComponentsPage() {
                         </td>
                         <td data-label="Đơn giá" className="kk-col-price is-num">
                           {fmtPrice(c.unit_price)}
+                        </td>
+                        <td data-label="Giá trị" className="kk-col-price is-num">
+                          {Number(c.unit_price) > 0 ? fmtMoneyFull(c.stock_value) : '—'}
                         </td>
                         <td data-label="Trạng thái">
                           <StatusChip status={c.status} />
