@@ -227,7 +227,7 @@ export default function ComponentsPage() {
                 <PackagePlus size={18} />
                 Thêm linh kiện
               </button>
-              <button type="button" className="kk-btn kk-btn-outline" onClick={() => openTx({ type: 'in' })}>
+              <button type="button" className="kk-btn kk-btn-outline kk-c-in" onClick={() => openTx({ type: 'in' })}>
                 <ArrowDownToLine size={18} />
                 Nhập / xuất kho
               </button>

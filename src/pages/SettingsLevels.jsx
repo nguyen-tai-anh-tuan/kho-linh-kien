@@ -163,7 +163,7 @@ export default function SettingsLevels() {
                       />
                       <button
                         type="button"
-                        className="kk-icon-btn"
+                        className="kk-icon-btn kk-c-del"
                         aria-label={`Bỏ mức riêng của danh mục ${c.name}`}
                         title="Bỏ mức riêng, quay về mức phía trên"
                         onClick={() => setDialog({ kind: 'clear', category: c })}

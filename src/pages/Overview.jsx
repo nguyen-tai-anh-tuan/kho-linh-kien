@@ -127,11 +127,11 @@ export default function Overview() {
         </div>
         {canEdit && (
           <div className="kk-quick">
-            <button type="button" className="kk-btn kk-btn-primary" onClick={() => openTx({ type: 'in' })}>
+            <button type="button" className="kk-btn kk-btn-primary kk-c-in" onClick={() => openTx({ type: 'in' })}>
               <ArrowDownToLine size={18} />
               Nhập kho
             </button>
-            <button type="button" className="kk-btn kk-btn-outline" onClick={() => openTx({ type: 'out' })}>
+            <button type="button" className="kk-btn kk-btn-outline kk-c-out" onClick={() => openTx({ type: 'out' })}>
               <ArrowUpFromLine size={18} />
               Xuất kho
             </button>
@@ -354,11 +354,11 @@ function FlowChart({ data }) {
     <>
       <ul className="kk-legend" aria-label="Chú thích">
         <li>
-          <i className="kk-legend-key" style={{ background: 'var(--series-1)' }} />
+          <i className="kk-legend-key" style={{ background: 'var(--kk-in)' }} />
           Nhập
         </li>
         <li>
-          <i className="kk-legend-key" style={{ background: 'var(--series-2)' }} />
+          <i className="kk-legend-key" style={{ background: 'var(--kk-out)' }} />
           Xuất
         </li>
       </ul>
@@ -375,8 +375,8 @@ function FlowChart({ data }) {
             />
             <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={44} tick={{ fontSize: 12, fill: 'var(--muted)' }} />
             <Tooltip content={<ChartTip />} cursor={{ fill: 'var(--kk-hover)' }} isAnimationActive={false} />
-            <Bar dataKey="qty_in" name="Nhập" fill="var(--series-1)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
-            <Bar dataKey="qty_out" name="Xuất" fill="var(--series-2)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+            <Bar dataKey="qty_in" name="Nhập" fill="var(--kk-in)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+            <Bar dataKey="qty_out" name="Xuất" fill="var(--kk-out)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
           </BarChart>
         </ResponsiveContainer>
       </div>

@@ -270,7 +270,7 @@ export default function ShoppingPage() {
           {canPlan && outUnplanned.length > 0 && (
             <button
               type="button"
-              className="kk-btn kk-btn-primary"
+              className="kk-btn kk-btn-primary kk-c-plan"
               disabled={adding}
               title="Đưa mọi món hết hàng chưa có trong danh sách mua trước vào danh sách đó"
               onClick={() => addToPlan(outUnplanned)}
@@ -338,7 +338,7 @@ export default function ShoppingPage() {
       {canPlan && chosen.length > 0 && (
         <div className="kk-bulk" role="region" aria-label="Thao tác với mục đã chọn">
           <strong>Đã chọn {fmtNum(chosen.length)}</strong>
-          <button type="button" className="kk-btn kk-btn-primary kk-btn-sm" disabled={adding} onClick={() => addToPlan(chosen)}>
+          <button type="button" className="kk-btn kk-btn-primary kk-btn-sm kk-c-plan" disabled={adding} onClick={() => addToPlan(chosen)}>
             {adding ? <Loader2 size={16} className="kk-spin" /> : <ListPlus size={16} />}
             Thêm vào danh sách mua trước
           </button>
@@ -390,7 +390,7 @@ export default function ShoppingPage() {
                     <th>Linh kiện</th>
                     <th className="kk-col-pkg">Package</th>
                     <th>Tồn kho</th>
-                    <th className="is-num">Tối thiểu</th>
+                    <th className="is-num kk-col-min">Tối thiểu</th>
                     <th className="is-num">Nên mua</th>
                     <th className="kk-col-price is-num">Đơn giá</th>
                     <th className="kk-col-price is-num">Thành tiền</th>
@@ -465,8 +465,9 @@ export default function ShoppingPage() {
                       </td>
                       <td data-label="Tồn kho">
                         <StockBar qty={c.total_quantity} min={c.min_stock} status={c.status} />
+                        {c.min_stock > 0 && <small className="kk-min-note">tối thiểu {fmtNum(c.min_stock)}</small>}
                       </td>
-                      <td data-label="Tối thiểu" className="is-num">
+                      <td data-label="Tối thiểu" className="is-num kk-col-min">
                         {c.min_stock > 0 ? fmtNum(c.min_stock) : '—'}
                       </td>
                       <td data-label="Nên mua" className="is-num">
@@ -511,7 +512,7 @@ export default function ShoppingPage() {
                           {canPlan && !plan && (
                             <button
                               type="button"
-                              className="kk-btn kk-btn-outline kk-btn-sm"
+                              className="kk-btn kk-btn-outline kk-btn-sm kk-c-plan"
                               title="Thêm vào danh sách mua trước (sửa được số lượng, link shop, dự án)"
                               onClick={() => setPlanDialog(presetOf(c))}
                             >
@@ -521,7 +522,7 @@ export default function ShoppingPage() {
                           )}
                           <button
                             type="button"
-                            className="kk-btn kk-btn-soft kk-btn-sm kk-buy-in"
+                            className="kk-btn kk-btn-soft kk-btn-sm kk-buy-in kk-c-in"
                             title="Nhập kho (mua về rồi thì bấm)"
                             aria-label={`Nhập kho ${c.part_number}`}
                             onClick={() => openTx({ type: 'in', componentId: c.id })}

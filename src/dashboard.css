@@ -28,6 +28,13 @@
   --kk-toast-ink: #ffffff;
   --kk-toast-accent: #ffd36b;
   --kk-toast-error: #6d1c22;
+
+  /* Màu theo ý nghĩa thao tác: nhìn màu là biết nút làm gì */
+  --kk-in: #0f8a47; /* nhập kho, đã mua, xác nhận */
+  --kk-out: #c2501b; /* xuất kho */
+  --kk-plan: #2a6fc9; /* lên kế hoạch mua, sửa */
+  --kk-del: #d6343a; /* xóa */
+  --kk-on-tone: #ffffff;
 }
 
 [data-theme='dark'] {
@@ -49,6 +56,12 @@
   --kk-toast-ink: #0f2a31;
   --kk-toast-accent: #0a6f66;
   --kk-toast-error: #ffd9db;
+
+  --kk-in: #5fd68f;
+  --kk-out: #ff9a62;
+  --kk-plan: #7ab3f5;
+  --kk-del: #ff8a8f;
+  --kk-on-tone: #0b1d22;
 }
 
 /* ===== Nền tảng ===== */
@@ -196,6 +209,67 @@
 .kk-icon-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+/* Nút biểu tượng mang nghĩa: xác nhận (xanh lá) và hủy (đỏ nhạt) */
+.kk-icon-btn-ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 30%, transparent);
+}
+.kk-icon-btn-ok:hover:not(:disabled) {
+  background: var(--ok);
+  color: var(--card);
+}
+.kk-icon-btn-cancel {
+  color: color-mix(in srgb, var(--danger) 75%, var(--muted));
+}
+.kk-icon-btn-cancel:hover:not(:disabled) {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.kk-icon-btn-ok,
+.kk-icon-btn-cancel {
+  transition: background 0.15s, color 0.15s;
+}
+/* ---------------------------------------------------------------
+   Tô màu nút theo ý nghĩa. Gắn thêm vào kk-btn-* hoặc kk-icon-btn:
+   kk-c-in (nhập, đã mua), kk-c-out (xuất), kk-c-plan (lên DS mua),
+   kk-c-edit (sửa), kk-c-del (xóa)
+   --------------------------------------------------------------- */
+.kk-c-in { --tone: var(--kk-in); }
+.kk-c-out { --tone: var(--kk-out); }
+.kk-c-plan,
+.kk-c-edit { --tone: var(--kk-plan); }
+.kk-c-del { --tone: var(--kk-del); }
+
+.kk-btn-primary:is(.kk-c-in, .kk-c-out, .kk-c-plan) {
+  background: linear-gradient(135deg, var(--tone), color-mix(in srgb, var(--tone) 78%, #000));
+  color: var(--kk-on-tone);
+  box-shadow: 0 10px 20px -12px var(--tone);
+}
+.kk-btn-soft:is(.kk-c-in, .kk-c-out, .kk-c-plan, .kk-c-edit, .kk-c-del) {
+  background: color-mix(in srgb, var(--tone) 13%, var(--card));
+  color: var(--tone);
+}
+.kk-btn-soft:is(.kk-c-in, .kk-c-out, .kk-c-plan, .kk-c-edit, .kk-c-del):hover:not(:disabled) {
+  background: color-mix(in srgb, var(--tone) 22%, var(--card));
+}
+.kk-btn-outline:is(.kk-c-in, .kk-c-out, .kk-c-plan, .kk-c-edit, .kk-c-del) {
+  border-color: color-mix(in srgb, var(--tone) 40%, var(--border));
+  color: var(--tone);
+}
+.kk-btn-outline:is(.kk-c-in, .kk-c-out, .kk-c-plan, .kk-c-edit, .kk-c-del):hover:not(:disabled) {
+  border-color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 9%, var(--card));
+}
+/* Nút xóa / sửa dạng chữ mờ hoặc biểu tượng: xám khi nghỉ, hiện màu khi rê chuột */
+.kk-btn-ghost:is(.kk-c-del, .kk-c-edit):hover:not(:disabled),
+.kk-icon-btn:is(.kk-c-del, .kk-c-edit):hover:not(:disabled) {
+  background: color-mix(in srgb, var(--tone) 12%, var(--card));
+  color: var(--tone);
+}
+.kk-icon-btn-boxed:is(.kk-c-del, .kk-c-edit):hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--tone) 50%, var(--border));
 }
 .kk-icon-btn-boxed {
   border: 1.5px solid var(--border);
@@ -830,12 +904,12 @@ button.kk-stat:focus-visible {
   border-radius: 10px;
 }
 .kk-ico-in {
-  background: color-mix(in srgb, var(--series-1) 16%, var(--card));
-  color: var(--series-1);
+  background: color-mix(in srgb, var(--kk-in) 16%, var(--card));
+  color: var(--kk-in);
 }
 .kk-ico-out {
-  background: color-mix(in srgb, var(--series-2) 16%, var(--card));
-  color: var(--series-2);
+  background: color-mix(in srgb, var(--kk-out) 16%, var(--card));
+  color: var(--kk-out);
 }
 .kk-ico-adj {
   background: var(--kk-soft);
@@ -1607,8 +1681,8 @@ button.kk-stat:focus-visible {
   color: var(--text);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
 }
-.kk-seg-in.is-on svg { color: var(--series-1); }
-.kk-seg-out.is-on svg { color: var(--series-2); }
+.kk-seg-in.is-on svg { color: var(--kk-in); }
+.kk-seg-out.is-on svg { color: var(--kk-out); }
 .kk-seg-adjust.is-on svg { color: var(--kk-link); }
 .kk-txlines {
   display: grid;
@@ -2116,16 +2190,16 @@ button.kk-stat:focus-visible {
 
 /* Nhãn loại giao dịch */
 .kk-type-in {
-  background: color-mix(in srgb, var(--series-1) 16%, var(--card));
+  background: color-mix(in srgb, var(--kk-in) 16%, var(--card));
 }
 .kk-type-in svg {
-  color: var(--series-1);
+  color: var(--kk-in);
 }
 .kk-type-out {
-  background: color-mix(in srgb, var(--series-2) 16%, var(--card));
+  background: color-mix(in srgb, var(--kk-out) 16%, var(--card));
 }
 .kk-type-out svg {
-  color: var(--series-2);
+  color: var(--kk-out);
 }
 .kk-type-adjust {
   background: var(--kk-soft);
@@ -2911,6 +2985,21 @@ button.kk-mega-name:hover {
 a.kk-plan-status {
   text-decoration: none;
 }
+/* Màn hình vừa: gộp cột "Tối thiểu" vào ô Tồn kho để bảng không phải kéo ngang */
+.kk-min-note {
+  display: none;
+  margin-top: 2px;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+@media (min-width: 721px) and (max-width: 1500px) {
+  .kk-buy-table .kk-col-min {
+    display: none;
+  }
+  .kk-buy-table .kk-min-note {
+    display: block;
+  }
+}
 /* Bảng "Theo tồn kho" nhiều cột: thu gọn để vừa màn hình, không phải kéo ngang */
 .kk-buy-in {
   width: 34px;
@@ -2920,8 +3009,8 @@ a.kk-plan-status {
 @media (min-width: 721px) {
   .kk-buy-table th,
   .kk-buy-table td {
-    padding-left: 10px;
-    padding-right: 10px;
+    padding-left: 8px;
+    padding-right: 8px;
   }
   .kk-buy-table .kk-stock {
     gap: 6px;
@@ -3494,8 +3583,8 @@ a.kk-mega-link:hover {
 }
 .kk-plan-badge.is-new {
   border-color: transparent;
-  background: color-mix(in srgb, var(--series-1) 16%, var(--card));
-  color: var(--series-1);
+  background: color-mix(in srgb, var(--kk-plan) 16%, var(--card));
+  color: var(--kk-plan);
 }
 .kk-plan-note {
   display: block;
@@ -3518,8 +3607,8 @@ a.kk-mega-link:hover {
 }
 .kk-plan-status.is-ordered {
   border-color: transparent;
-  background: color-mix(in srgb, var(--series-1) 16%, var(--card));
-  color: var(--series-1);
+  background: color-mix(in srgb, var(--kk-plan) 16%, var(--card));
+  color: var(--kk-plan);
 }
 button.kk-plan-status:hover:not(:disabled) {
   filter: brightness(0.96);
@@ -3587,10 +3676,10 @@ button.kk-plan-status:hover:not(:disabled) {
 .kk-price-row {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
 }
 :is(.kk, .kk-portal) .kk-price-row input:not([type='checkbox']):not([type='file']) {
-  width: 104px;
+  width: 88px;
   height: 34px;
   padding: 4px 8px;
   text-align: right;

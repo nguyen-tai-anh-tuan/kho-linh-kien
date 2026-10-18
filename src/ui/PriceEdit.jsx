@@ -53,10 +53,10 @@ export function InlinePrice({ value, canEdit, label, onSave, option, note, align
             onChange={(e) => setEdit((s) => ({ ...s, value: e.target.value, error: '' }))}
             onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setEdit(null))}
           />
-          <button type="submit" className="kk-icon-btn" aria-label="Lưu đơn giá" title="Lưu (Enter)" disabled={edit.saving}>
+          <button type="submit" className="kk-icon-btn kk-icon-btn-ok" aria-label="Lưu đơn giá" title="Lưu (Enter)" disabled={edit.saving}>
             {edit.saving ? <Loader2 size={16} className="kk-spin" /> : <Check size={16} />}
           </button>
-          <button type="button" className="kk-icon-btn" aria-label="Hủy" title="Hủy (Esc)" disabled={edit.saving} onClick={() => setEdit(null)}>
+          <button type="button" className="kk-icon-btn kk-icon-btn-cancel" aria-label="Hủy" title="Hủy (Esc)" disabled={edit.saving} onClick={() => setEdit(null)}>
             <X size={16} />
           </button>
         </span>

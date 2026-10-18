@@ -233,7 +233,7 @@ export default function HistoryPage() {
           ) : (
             <EmptyState title="Chưa có giao dịch nào" text="Mỗi lần nhập, xuất hay kiểm kê sẽ được ghi lại ở đây.">
               {canEdit && (
-                <button type="button" className="kk-btn kk-btn-primary" onClick={() => openTx({ type: 'in' })}>
+                <button type="button" className="kk-btn kk-btn-primary kk-c-in" onClick={() => openTx({ type: 'in' })}>
                   <ArrowDownToLine size={18} />
                   Nhập kho
                 </button>

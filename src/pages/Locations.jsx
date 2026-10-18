@@ -266,7 +266,7 @@ export default function LocationsPage() {
                   <div className="kk-pane-actions">
                     <button
                       type="button"
-                      className="kk-btn kk-btn-primary kk-btn-sm"
+                      className="kk-btn kk-btn-primary kk-btn-sm kk-c-in"
                       onClick={() => openTx({ type: 'in', locationId: selected.id })}
                     >
                       <ArrowDownToLine size={16} />
@@ -282,7 +282,7 @@ export default function LocationsPage() {
                     </button>
                     <button
                       type="button"
-                      className="kk-icon-btn kk-icon-btn-boxed"
+                      className="kk-icon-btn kk-icon-btn-boxed kk-c-edit"
                       aria-label={`Đổi tên ${selected.name}`}
                       title="Đổi tên"
                       onClick={() => setDialog({ kind: 'rename', loc: selected })}
@@ -292,7 +292,7 @@ export default function LocationsPage() {
                     {isAdmin && (
                       <button
                         type="button"
-                        className="kk-icon-btn kk-icon-btn-boxed"
+                        className="kk-icon-btn kk-icon-btn-boxed kk-c-del"
                         aria-label={`Xóa ${selected.name}`}
                         title={deleteBlocked || 'Xóa vị trí'}
                         disabled={Boolean(deleteBlocked)}
@@ -327,7 +327,7 @@ export default function LocationsPage() {
                   {canEdit && (
                     <button
                       type="button"
-                      className="kk-btn kk-btn-primary"
+                      className="kk-btn kk-btn-primary kk-c-in"
                       onClick={() => openTx({ type: 'in', locationId: selected.id })}
                     >
                       <ArrowDownToLine size={18} />

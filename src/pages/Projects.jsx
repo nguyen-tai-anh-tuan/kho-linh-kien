@@ -444,11 +444,11 @@ function ProjectDetail({ project, lines, images, tracked, setBom, refetchBom, on
           </Link>
         {canEdit && (
           <>
-            <button type="button" className="kk-icon-btn kk-icon-btn-boxed" aria-label="Sửa dự án" title="Sửa dự án" onClick={onEdit}>
+            <button type="button" className="kk-icon-btn kk-icon-btn-boxed kk-c-edit" aria-label="Sửa dự án" title="Sửa dự án" onClick={onEdit}>
               <Pencil size={16} />
             </button>
             {isAdmin && (
-              <button type="button" className="kk-icon-btn kk-icon-btn-boxed" aria-label="Xóa dự án" title="Xóa dự án" onClick={onDelete}>
+              <button type="button" className="kk-icon-btn kk-icon-btn-boxed kk-c-del" aria-label="Xóa dự án" title="Xóa dự án" onClick={onDelete}>
                 <Trash2 size={16} />
               </button>
             )}
@@ -510,7 +510,7 @@ function ProjectDetail({ project, lines, images, tracked, setBom, refetchBom, on
                 )}
                 <button
                   type="button"
-                  className="kk-btn kk-btn-primary kk-btn-sm"
+                  className="kk-btn kk-btn-primary kk-btn-sm kk-c-out"
                   disabled={pending.length === 0}
                   title={allIssued ? 'Mọi linh kiện đã được xuất đủ. Tăng số bộ, thêm linh kiện, hoặc bắt đầu đợt mới.' : undefined}
                   onClick={() => setExporting(true)}
@@ -604,7 +604,7 @@ function ProjectDetail({ project, lines, images, tracked, setBom, refetchBom, on
                     <td className="kk-col-act">
                       <button
                         type="button"
-                        className="kk-icon-btn"
+                        className="kk-icon-btn kk-c-del"
                         aria-label={`Bỏ ${r.comp.part_number} khỏi BOM`}
                         title={tracked && r.issued > 0 ? `Bỏ khỏi BOM và trả ${fmtNum(r.issued)} cái đã xuất về kho` : 'Bỏ khỏi BOM'}
                         onClick={() => removeLine(r)}
@@ -803,7 +803,7 @@ function BomExportModal({ project, rows, skipped, builds, tracked, onIssued, onC
           <button type="button" className="kk-btn kk-btn-ghost" onClick={onClose} disabled={busy}>
             Hủy
           </button>
-          <button type="button" className="kk-btn kk-btn-primary" onClick={submit} disabled={busy || ready.length === 0}>
+          <button type="button" className="kk-btn kk-btn-primary kk-c-out" onClick={submit} disabled={busy || ready.length === 0}>
             {busy ? <Loader2 size={18} className="kk-spin" /> : <ArrowUpFromLine size={18} />}
             {busy ? 'Đang xuất…' : missing.length > 0 ? `Chỉ xuất ${fmtNum(ready.length)} món đủ hàng` : 'Xuất kho'}
           </button>

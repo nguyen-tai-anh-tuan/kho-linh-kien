@@ -328,7 +328,7 @@ export default function PurchasePlan({ items }) {
         ) : (
           <>
             <div className="kk-table-scroll">
-              <table className="kk-table kk-table-plain kk-table-static">
+              <table className="kk-table kk-table-plain kk-table-static kk-buy-table">
                 <thead>
                   <tr>
                     <th>Linh kiện</th>
@@ -437,13 +437,13 @@ export default function PurchasePlan({ items }) {
                         {canEdit && (
                           <td className="kk-col-plan-act">
                             <span className="kk-plan-actions">
-                              <button type="button" className="kk-btn kk-btn-soft kk-btn-sm" onClick={() => setDialog({ kind: 'receive', item: r.item })}>
+                              <button type="button" className="kk-btn kk-btn-soft kk-btn-sm kk-c-in" onClick={() => setDialog({ kind: 'receive', item: r.item })}>
                                 <PackageCheck size={16} />
                                 Đã mua
                               </button>
                               <button
                                 type="button"
-                                className="kk-icon-btn"
+                                className="kk-icon-btn kk-c-edit"
                                 aria-label={`Sửa ${r.part}`}
                                 title="Sửa"
                                 onClick={() => setDialog({ kind: 'form', item: r.item })}
@@ -452,7 +452,7 @@ export default function PurchasePlan({ items }) {
                               </button>
                               <button
                                 type="button"
-                                className="kk-icon-btn"
+                                className="kk-icon-btn kk-c-del"
                                 aria-label={`Xóa ${r.part} khỏi danh sách`}
                                 title="Xóa khỏi danh sách"
                                 onClick={() => setDialog({ kind: 'delete', item: r.item, part: r.part })}
@@ -861,7 +861,7 @@ function ReceiveDialog({ item, onDone, onClose }) {
           <button type="button" className="kk-btn kk-btn-ghost" onClick={onClose} disabled={busy}>
             Hủy
           </button>
-          <button type="button" className="kk-btn kk-btn-primary" onClick={run} disabled={busy}>
+          <button type="button" className="kk-btn kk-btn-primary kk-c-in" onClick={run} disabled={busy}>
             {busy ? <Loader2 size={18} className="kk-spin" /> : <PackageCheck size={18} />}
             {busy ? 'Đang nhập kho…' : 'Nhập kho'}
           </button>

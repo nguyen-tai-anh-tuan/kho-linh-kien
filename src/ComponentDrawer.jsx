@@ -151,12 +151,12 @@ export default function ComponentDrawer({ id, onClose }) {
               {archiving ? <Loader2 size={18} className="kk-spin" /> : <RotateCcw size={18} />}
               Dùng lại
             </button>
-            <button type="button" className="kk-btn kk-btn-outline" onClick={() => openForm(c)}>
+            <button type="button" className="kk-btn kk-btn-outline kk-c-edit" onClick={() => openForm(c)}>
               <Pencil size={18} />
               Sửa
             </button>
             {isAdmin && (
-              <button type="button" className="kk-btn kk-btn-ghost kk-push-right" onClick={() => setConfirmDelete(true)}>
+              <button type="button" className="kk-btn kk-btn-ghost kk-push-right kk-c-del" onClick={() => setConfirmDelete(true)}>
                 <Trash2 size={18} />
                 Xóa hẳn
               </button>
@@ -164,13 +164,13 @@ export default function ComponentDrawer({ id, onClose }) {
           </>
         ) : (
           <>
-            <button type="button" className="kk-btn kk-btn-primary" onClick={() => openTx({ type: 'in', componentId: id })}>
+            <button type="button" className="kk-btn kk-btn-primary kk-c-in" onClick={() => openTx({ type: 'in', componentId: id })}>
               <ArrowDownToLine size={18} />
               Nhập
             </button>
             <button
               type="button"
-              className="kk-btn kk-btn-outline"
+              className="kk-btn kk-btn-outline kk-c-out"
               onClick={() => openTx({ type: 'out', componentId: id })}
               disabled={c.total_quantity === 0}
               title={c.total_quantity === 0 ? 'Linh kiện này đang hết hàng' : undefined}
@@ -178,7 +178,7 @@ export default function ComponentDrawer({ id, onClose }) {
               <ArrowUpFromLine size={18} />
               Xuất
             </button>
-            <button type="button" className="kk-btn kk-btn-outline" onClick={() => openForm(c)}>
+            <button type="button" className="kk-btn kk-btn-outline kk-c-edit" onClick={() => openForm(c)}>
               <Pencil size={18} />
               Sửa
             </button>
@@ -193,7 +193,7 @@ export default function ComponentDrawer({ id, onClose }) {
               Ngừng dùng
             </button>
             {isAdmin && (
-              <button type="button" className="kk-btn kk-btn-ghost" onClick={() => setConfirmDelete(true)}>
+              <button type="button" className="kk-btn kk-btn-ghost kk-c-del" onClick={() => setConfirmDelete(true)}>
                 <Trash2 size={18} />
                 Xóa hẳn
               </button>

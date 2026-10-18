@@ -220,7 +220,12 @@ function TxModal({ type: initialType = 'in', componentId, componentIds, location
           <button type="button" className="kk-btn kk-btn-ghost" onClick={onClose}>
             Hủy
           </button>
-          <button type="button" className="kk-btn kk-btn-primary" onClick={submit} disabled={submitting}>
+          <button
+            type="button"
+            className={`kk-btn kk-btn-primary ${type === 'in' ? 'kk-c-in' : type === 'out' ? 'kk-c-out' : ''}`}
+            onClick={submit}
+            disabled={submitting}
+          >
             {submitting ? <Loader2 size={18} className="kk-spin" /> : <T.Icon size={18} />}
             {submitting ? 'Đang lưu…' : T.submit}
           </button>
@@ -298,7 +303,7 @@ function TxModal({ type: initialType = 'in', componentId, componentIds, location
                   </Field>
                   <button
                     type="button"
-                    className="kk-icon-btn kk-txline-remove"
+                    className="kk-icon-btn kk-txline-remove kk-c-del"
                     aria-label="Xóa dòng này"
                     disabled={lines.length === 1}
                     onClick={() => setLines((ls) => ls.filter((x) => x.id !== l.id))}

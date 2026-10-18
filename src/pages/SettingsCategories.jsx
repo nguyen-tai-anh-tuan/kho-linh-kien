@@ -96,7 +96,7 @@ export default function SettingsCategories() {
         {isAdmin && (
           <button
             type="button"
-            className="kk-icon-btn"
+            className="kk-icon-btn kk-c-edit"
             aria-label={`Đổi tên ${c.name}`}
             title="Đổi tên"
             onClick={() => setDialog({ kind: 'rename', category: c })}
@@ -117,7 +117,7 @@ export default function SettingsCategories() {
             </button>
             <button
               type="button"
-              className="kk-icon-btn"
+              className="kk-icon-btn kk-c-del"
               aria-label={`Xóa ${c.name}`}
               title={kids.length > 0 ? 'Hãy xóa hoặc chuyển các danh mục bên trong trước' : 'Xóa danh mục'}
               disabled={kids.length > 0}

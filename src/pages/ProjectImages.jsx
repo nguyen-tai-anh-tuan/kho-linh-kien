@@ -135,7 +135,7 @@ export function ProjectGallery({ project, images, urls, missing, onChanged, read
                   </button>
                   <button
                     type="button"
-                    className="kk-icon-btn"
+                    className="kk-icon-btn kk-c-del"
                     aria-label={`Xóa ${slot.label.toLowerCase()}`}
                     title="Xóa ảnh"
                     disabled={busy !== null}
