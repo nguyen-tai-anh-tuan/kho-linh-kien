@@ -16,7 +16,7 @@ import { useTx } from '../TxContext'
 import { useShell } from '../ShellContext'
 import { EmptyState, Skeleton, TraceLoader } from '../ui/common'
 import { friendlyError } from '../lib/api'
-import { fmtDay, fmtNum, greeting, timeAgo } from '../lib/format'
+import { fmtDay, fmtMoney, fmtMoneyFull, fmtNum, greeting, timeAgo } from '../lib/format'
 import { StatCard, StockStatCards, stockStats } from '../ui/stats'
 
 // Hai danh sách ở cuối trang hiện tối đa chừng này dòng, trong một khung cuộn cao cố định
@@ -41,13 +41,32 @@ export default function Overview() {
   // Cùng một danh sách với trang Cần mua: hết hàng, dưới mức tối thiểu, hoặc thiếu cho BOM của dự án
   const { bomByComponent, toBuy, need } = useBuyList()
 
+  // Biểu đồ danh mục tính theo số lượng hay theo giá trị tồn (nhớ lựa chọn trên máy này)
+  const [catMetric, setCatMetric] = useState(() => {
+    try {
+      return localStorage.getItem('kk-cat-metric') === 'value' ? 'value' : 'qty'
+    } catch {
+      return 'qty'
+    }
+  })
+  function pickMetric(m) {
+    setCatMetric(m)
+    try {
+      localStorage.setItem('kk-cat-metric', m)
+    } catch {
+      /* trình duyệt chặn lưu thì thôi */
+    }
+  }
+  const byValue = catMetric === 'value'
+
   const slices = useMemo(() => {
     // Gộp theo danh mục lớn: món nằm ở danh mục con hay chi tiết đều tính vào danh mục lớn chứa nó
     const byCat = new Map()
     for (const c of components) {
-      if (c.total_quantity <= 0) continue
+      const amount = byValue ? (Number(c.unit_price) > 0 ? Number(c.stock_value) || 0 : 0) : c.total_quantity
+      if (amount <= 0) continue
       const key = categoriesById.get(c.category_id)?.root_id ?? 'none'
-      byCat.set(key, (byCat.get(key) ?? 0) + c.total_quantity)
+      byCat.set(key, (byCat.get(key) ?? 0) + amount)
     }
     const nameOf = new Map(categories.map((c) => [c.id, c.name]))
     const list = [...byCat.entries()]
@@ -60,10 +79,17 @@ export default function Overview() {
       .sort((a, b) => b.value - a.value)
     const head = list.filter((s) => s.id !== 'none').slice(0, 5)
     const restValue = list.filter((s) => !head.includes(s)).reduce((sum, s) => sum + s.value, 0)
-    const result = head.map((s) => ({ ...s, color: `var(--series-${(s.tone ?? 0) + 1})` }))
+    // Giữ màu của danh mục nếu chưa lát nào dùng; trùng thì lấy màu kế tiếp còn trống, để các lát luôn khác màu
+    const used = new Set()
+    const result = head.map((s) => {
+      let tone = s.tone ?? 0
+      for (let k = 0; k < 6 && used.has(tone % 6); k++) tone++
+      used.add(tone % 6)
+      return { ...s, color: `var(--series-${(tone % 6) + 1})` }
+    })
     if (restValue > 0) result.push({ id: 'other', name: 'Khác', value: restValue, tone: null, color: 'var(--kk-other)' })
     return result
-  }, [components, categories, categoriesById, toneByCategory])
+  }, [components, categories, categoriesById, toneByCategory, byValue])
 
   /* ---- dữ liệu theo ngày và hoạt động gần đây ---- */
   const [flow, setFlow] = useState(null)
@@ -176,17 +202,37 @@ export default function Overview() {
 
         <ChartCard
           title="Tồn kho theo danh mục lớn"
-          summary={`${fmtNum(stats.qty)} cái`}
+          summary={
+            byValue
+              ? `${fmtMoneyFull(stats.value)}${stats.unpriced > 0 ? `, chưa tính ${fmtNum(stats.unpriced)} mã chưa có giá` : ''}`
+              : `${fmtNum(stats.qty)} cái`
+          }
+          toolbar={
+            <div className="kk-toggle" role="group" aria-label="Tính biểu đồ theo">
+              <button type="button" aria-pressed={!byValue} onClick={() => pickMetric('qty')}>
+                Số lượng
+              </button>
+              <button type="button" aria-pressed={byValue} onClick={() => pickMetric('value')}>
+                Giá trị
+              </button>
+            </div>
+          }
           tableData={slices}
           tableColumns={[
             { key: 'name', title: 'Loại' },
-            { key: 'value', title: 'Số lượng', num: true },
+            byValue
+              ? { key: 'value', title: 'Giá trị tồn', num: true, fmt: fmtMoneyFull }
+              : { key: 'value', title: 'Số lượng', num: true },
           ]}
           tableRows={slices}
-          emptyText="Chưa có hàng trong kho."
+          emptyText={byValue ? 'Chưa có linh kiện nào có đơn giá.' : 'Chưa có hàng trong kho.'}
           isEmpty={slices.length === 0}
         >
-          <DonutChart slices={slices} total={stats.qty} />
+          {byValue ? (
+            <DonutChart slices={slices} total={stats.value} fmt={fmtMoney} tipFmt={fmtMoneyFull} unit="giá trị kho" />
+          ) : (
+            <DonutChart slices={slices} total={stats.qty} />
+          )}
         </ChartCard>
       </section>
 
@@ -277,7 +323,7 @@ export default function Overview() {
 
 /* ------------------------------------------------------------------ */
 
-function ChartCard({ title, summary, children, loading, error, isEmpty, emptyText, tableColumns, tableRows }) {
+function ChartCard({ title, summary, toolbar, children, loading, error, isEmpty, emptyText, tableColumns, tableRows }) {
   const [view, setView] = useState('chart')
   return (
     <div className="kk-card kk-chart-card">
@@ -295,6 +341,7 @@ function ChartCard({ title, summary, children, loading, error, isEmpty, emptyTex
           </button>
         </div>
       </div>
+      {toolbar && <div className="kk-chart-toolbar">{toolbar}</div>}
       {error ? (
         <p className="kk-form-error">{error}</p>
       ) : loading ? (
@@ -320,7 +367,7 @@ function ChartCard({ title, summary, children, loading, error, isEmpty, emptyTex
                 <tr key={r.id ?? r.day ?? i}>
                   {tableColumns.map((c) => (
                     <td key={c.key} className={c.num ? 'is-num' : ''}>
-                      {c.num ? fmtNum(r[c.key]) : r[c.key]}
+                      {c.fmt ? c.fmt(r[c.key]) : c.num ? fmtNum(r[c.key]) : r[c.key]}
                     </td>
                   ))}
                 </tr>
@@ -333,7 +380,7 @@ function ChartCard({ title, summary, children, loading, error, isEmpty, emptyTex
   )
 }
 
-function ChartTip({ active, payload, label, titleOf }) {
+function ChartTip({ active, payload, label, titleOf, fmt = fmtNum }) {
   if (!active || !payload || payload.length === 0) return null
   return (
     <div className="kk-tip">
@@ -341,7 +388,7 @@ function ChartTip({ active, payload, label, titleOf }) {
       {payload.map((p) => (
         <div key={p.dataKey ?? p.name} className="kk-tip-row">
           <i className="kk-tip-key" style={{ background: p.color || p.payload?.color }} />
-          <strong>{fmtNum(p.value)}</strong>
+          <strong>{fmt(p.value)}</strong>
           <span>{p.name}</span>
         </div>
       ))}
@@ -384,7 +431,8 @@ function FlowChart({ data }) {
   )
 }
 
-function DonutChart({ slices, total }) {
+/** fmt: cách ghi số ở giữa và chú thích; tipFmt: số đầy đủ khi rê chuột */
+function DonutChart({ slices, total, fmt = fmtNum, tipFmt = fmtNum, unit = 'cái' }) {
   return (
     <div className="kk-donut">
       <div className="kk-donut-chart">
@@ -405,12 +453,12 @@ function DonutChart({ slices, total }) {
                 <Cell key={s.id} fill={s.color} />
               ))}
             </Pie>
-            <Tooltip content={<ChartTip titleOf={(p) => p[0]?.name} />} isAnimationActive={false} />
+            <Tooltip content={<ChartTip titleOf={(p) => p[0]?.name} fmt={tipFmt} />} isAnimationActive={false} />
           </PieChart>
         </ResponsiveContainer>
-        <div className="kk-donut-center" aria-hidden="true">
-          <strong>{fmtNum(total)}</strong>
-          <span>cái</span>
+        <div className={`kk-donut-center ${String(fmt(total)).length > 7 ? 'is-long' : ''}`} aria-hidden="true">
+          <strong>{fmt(total)}</strong>
+          <span>{unit}</span>
         </div>
       </div>
       <ul className="kk-donut-legend">
@@ -418,8 +466,8 @@ function DonutChart({ slices, total }) {
           <li key={s.id}>
             <i className="kk-legend-key" style={{ background: s.color }} />
             <span className="kk-donut-name">{s.name}</span>
-            <strong>{fmtNum(s.value)}</strong>
-            <small>{Math.round((s.value / total) * 100)}%</small>
+            <strong title={tipFmt(s.value)}>{fmt(s.value)}</strong>
+            <small>{total > 0 ? Math.round((s.value / total) * 100) : 0}%</small>
           </li>
         ))}
       </ul>

@@ -3762,3 +3762,14 @@ button.kk-plan-status:hover:not(:disabled) {
 .kk-table .kk-col-price {
   white-space: nowrap;
 }
+
+/* Nút chuyển "Số lượng / Giá trị" của biểu đồ danh mục */
+.kk-chart-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin: -4px 0 8px;
+}
+
+.kk-donut-center.is-long strong {
+  font-size: 1.05rem;
+}
