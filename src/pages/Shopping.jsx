@@ -4,6 +4,7 @@ import { ArrowDownToLine, ChevronLeft, ChevronRight, ClipboardCopy, Download, Li
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
 import PurchasePlan, { PlanForm, usePurchaseItems } from './PurchasePlan'
+import { ComponentPrice } from '../ui/PriceEdit'
 import { useBuyList } from '../data/useBuyList'
 import { useTx } from '../TxContext'
 import { useShell } from '../ShellContext'
@@ -12,7 +13,7 @@ import { CategoryChip, EmptyState, Skeleton, StatusChip, StockBar } from '../ui/
 import { CategoryFilter } from '../ui/CategoryMenu'
 import { friendlyError, mustChange } from '../lib/api'
 import { downloadCSV } from '../lib/csv'
-import { fmtMoneyFull, fmtNum, fmtPrice, normalize } from '../lib/format'
+import { fmtMoneyFull, fmtNum, normalize } from '../lib/format'
 import { subtreeIds } from '../lib/tree'
 
 const KINDS = [
@@ -483,7 +484,7 @@ export default function ShoppingPage() {
                         </span>
                       </td>
                       <td data-label="Đơn giá" className="kk-col-price is-num">
-                        {fmtPrice(c.unit_price)}
+                        <ComponentPrice comp={c} />
                       </td>
                       <td data-label="Thành tiền" className="kk-col-price is-num">
                         {Number(c.unit_price) > 0 ? fmtMoneyFull(need(c) * Number(c.unit_price)) : '—'}

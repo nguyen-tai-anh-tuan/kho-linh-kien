@@ -18,8 +18,9 @@ import { useTx } from '../TxContext'
 import { useShell } from '../ShellContext'
 import { CategoryChip, EmptyState, Skeleton, StatusChip, StockBar } from '../ui/common'
 import { downloadCSV } from '../lib/csv'
-import { fmtMoneyFull, fmtNum, fmtPrice, normalize } from '../lib/format'
+import { fmtMoneyFull, fmtNum, normalize } from '../lib/format'
 import { StockStatCards, stockStats } from '../ui/stats'
+import { ComponentPrice } from '../ui/PriceEdit'
 import { CategoryFilter } from '../ui/CategoryMenu'
 import { subtreeIds } from '../lib/tree'
 
@@ -462,7 +463,7 @@ export default function ComponentsPage() {
                           <StockBar qty={c.total_quantity} min={c.min_stock} status={c.status} />
                         </td>
                         <td data-label="Đơn giá" className="kk-col-price is-num">
-                          {fmtPrice(c.unit_price)}
+                          <ComponentPrice comp={c} />
                         </td>
                         <td data-label="Giá trị" className="kk-col-price is-num">
                           {Number(c.unit_price) > 0 ? fmtMoneyFull(c.stock_value) : '—'}

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
-  Check,
   ChevronLeft,
   ChevronRight,
   ClipboardCopy,
@@ -16,7 +15,6 @@ import {
   Save,
   Trash2,
   Truck,
-  X,
 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
@@ -24,6 +22,7 @@ import { useShell } from '../ShellContext'
 import { useToast } from '../ui/Toast'
 import { Modal } from '../ui/Modal'
 import { ConfirmDialog } from '../ui/dialogs'
+import { InlinePrice } from '../ui/PriceEdit'
 import { CategoryChip, CategoryPicker, ComponentPicker, EmptyState, Field, QtyStepper, SelectWithCreate, Skeleton } from '../ui/common'
 import { friendlyError, isMissingSchema, mustChange } from '../lib/api'
 import { downloadCSV, parseNumber } from '../lib/csv'
@@ -97,7 +96,6 @@ async function savePrice(item, price, toStock) {
 export default function PurchasePlan({ items }) {
   const { componentsById, categoriesById, toneByCategory, projectsById, reload } = useData()
   const { openComponent, canEdit, isAdmin } = useShell()
-  const [priceEdit, setPriceEdit] = useState(null) // { id, value, toStock, saving, error }
   const toast = useToast()
   const [filter, setFilter] = useState('')
   const [page, setPage] = useState(0)
@@ -125,33 +123,16 @@ export default function PurchasePlan({ items }) {
     }
   }
 
-  function startPrice(r) {
-    setPriceEdit({ id: r.item.id, value: r.price !== null ? String(r.price) : '', toStock: Boolean(r.comp), saving: false, error: '' })
-  }
-
-  async function submitPrice(e, r) {
-    e.preventDefault()
-    if (!priceEdit || priceEdit.saving) return
-    const price = priceEdit.value.trim() === '' ? null : parseNumber(priceEdit.value)
-    if (price !== null && (Number.isNaN(price) || price < 0)) {
-      setPriceEdit((s) => ({ ...s, error: 'Nhập số tiền hợp lệ, vd 3500.' }))
-      return
-    }
-    setPriceEdit((s) => ({ ...s, saving: true, error: '' }))
-    try {
-      const inStock = await savePrice(r.item, price, priceEdit.toStock)
-      if (inStock) await reload()
-      items.refresh()
-      setPriceEdit(null)
-      toast.push({
-        message:
-          price === null
-            ? `Đã xóa đơn giá dự kiến của ${r.part}.`
-            : `Đã lưu đơn giá ${fmtPrice(price)} cho ${r.part}${inStock ? ', cập nhật luôn vào kho' : ''}.`,
-      })
-    } catch (err) {
-      setPriceEdit((s) => (s ? { ...s, saving: false, error: friendlyError(err) } : s))
-    }
+  async function changePrice(r, price, toStock) {
+    const inStock = await savePrice(r.item, price, toStock)
+    if (inStock) await reload()
+    items.refresh()
+    toast.push({
+      message:
+        price === null
+          ? `Đã xóa đơn giá dự kiến của ${r.part}.`
+          : `Đã lưu đơn giá ${fmtPrice(price)} cho ${r.part}${inStock ? ', cập nhật luôn vào kho' : ''}.`,
+    })
   }
 
   async function copyList() {
@@ -327,63 +308,21 @@ export default function PurchasePlan({ items }) {
                         <td data-label="Số lượng" className="is-num kk-strong-num">
                           {fmtNum(r.item.quantity)}
                         </td>
-                        <td data-label="Đơn giá" className="kk-col-price is-num kk-plan-price-cell">
-                          {canEdit && priceEdit?.id === r.item.id ? (
-                            <form className="kk-plan-price-form" onSubmit={(e) => submitPrice(e, r)}>
-                              <span className="kk-plan-price-row">
-                                <input
-                                  autoFocus
-                                  inputMode="decimal"
-                                  aria-label={`Đơn giá ${r.part} (đ)`}
-                                  placeholder="Vd: 3500"
-                                  value={priceEdit.value}
-                                  disabled={priceEdit.saving}
-                                  aria-invalid={priceEdit.error ? true : undefined}
-                                  onChange={(e) => setPriceEdit((s) => ({ ...s, value: e.target.value, error: '' }))}
-                                  onKeyDown={(e) => e.key === 'Escape' && setPriceEdit(null)}
-                                />
-                                <button type="submit" className="kk-icon-btn" aria-label="Lưu đơn giá" title="Lưu (Enter)" disabled={priceEdit.saving}>
-                                  {priceEdit.saving ? <Loader2 size={16} className="kk-spin" /> : <Check size={16} />}
-                                </button>
-                                <button type="button" className="kk-icon-btn" aria-label="Hủy" title="Hủy (Esc)" disabled={priceEdit.saving} onClick={() => setPriceEdit(null)}>
-                                  <X size={16} />
-                                </button>
-                              </span>
-                              {r.comp && (
-                                <label className="kk-plan-price-sync">
-                                  <input
-                                    type="checkbox"
-                                    checked={priceEdit.toStock}
-                                    disabled={priceEdit.saving}
-                                    onChange={(e) => setPriceEdit((s) => ({ ...s, toStock: e.target.checked }))}
-                                  />
-                                  Cập nhật vào kho
-                                </label>
-                              )}
-                              {priceEdit.error && (
-                                <span className="kk-form-error" role="alert">
-                                  {priceEdit.error}
-                                </span>
-                              )}
-                            </form>
-                          ) : canEdit ? (
-                            <button
-                              type="button"
-                              className={`kk-plan-price ${r.price === null ? 'is-empty' : ''}`}
-                              title={r.price === null ? 'Thêm đơn giá' : 'Bấm để sửa đơn giá'}
-                              onClick={() => startPrice(r)}
-                            >
-                              {r.price === null ? '+ Thêm giá' : fmtPrice(r.price)}
-                              <Pencil size={12} aria-hidden="true" />
-                            </button>
-                          ) : (
-                            fmtPrice(r.price)
-                          )}
-                          {r.stockPrice !== null && r.price !== null && r.price !== r.stockPrice && priceEdit?.id !== r.item.id && (
-                            <small className="kk-plan-price-note" title="Đơn giá dự kiến khác với đơn giá đang lưu trong kho">
-                              Kho: {fmtPrice(r.stockPrice)}
-                            </small>
-                          )}
+                        <td data-label="Đơn giá" className="kk-col-price is-num">
+                          <InlinePrice
+                            value={r.price}
+                            canEdit={canEdit}
+                            label={r.part}
+                            option={r.comp ? { label: 'Cập nhật vào kho', defaultChecked: true } : undefined}
+                            onSave={(price, toStock) => changePrice(r, price, toStock)}
+                            note={
+                              r.stockPrice !== null && r.price !== null && r.price !== r.stockPrice ? (
+                                <small className="kk-price-note" title="Đơn giá dự kiến khác với đơn giá đang lưu trong kho">
+                                  Kho: {fmtPrice(r.stockPrice)}
+                                </small>
+                              ) : null
+                            }
+                          />
                         </td>
                         <td data-label="Thành tiền" className="kk-col-price is-num">
                           {r.price !== null ? fmtMoneyFull(r.price * r.item.quantity) : '—'}
@@ -709,7 +648,7 @@ export function PlanForm({ initial, preset, onSaved, onClose }) {
             onChange={set('unit_price')}
           />
           {stockComp && (
-            <label className="kk-plan-price-sync">
+            <label className="kk-price-sync">
               <input type="checkbox" checked={toStock} onChange={(e) => setToStock(e.target.checked)} />
               Cập nhật đơn giá này vào kho
             </label>

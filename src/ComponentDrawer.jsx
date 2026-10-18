@@ -19,8 +19,9 @@ import { useShell } from './ShellContext'
 import { useToast } from './ui/Toast'
 import { Modal } from './ui/Modal'
 import { CategoryChip, Skeleton, StatusChip, StockBar } from './ui/common'
+import { ComponentPrice } from './ui/PriceEdit'
 import { friendlyError, isMissingSchema, mustChange } from './lib/api'
-import { fmtMoneyFull, fmtNum, fmtPrice, safeUrl, timeAgo } from './lib/format'
+import { fmtMoneyFull, fmtNum, safeUrl, timeAgo } from './lib/format'
 
 const TYPE_LABEL = { in: 'Nhập', out: 'Xuất', adjust: 'Điều chỉnh' }
 
@@ -269,7 +270,9 @@ export default function ComponentDrawer({ id, onClose }) {
           </div>
           <div>
             <dt>Đơn giá</dt>
-            <dd>{fmtPrice(c.unit_price)}</dd>
+            <dd>
+              <ComponentPrice comp={c} align="start" />
+            </dd>
           </div>
           <div>
             <dt>Giá trị tồn</dt>

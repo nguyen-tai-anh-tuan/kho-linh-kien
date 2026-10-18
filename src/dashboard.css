@@ -3535,73 +3535,85 @@ button.kk-plan-status:hover:not(:disabled) {
   width: 1%;
   white-space: nowrap;
 }
-/* Sửa đơn giá ngay trong danh sách mua trước */
-.kk-plan-price {
+/* Ô đơn giá bấm vào là sửa tại chỗ (Linh kiện, Cần mua, khung chi tiết) */
+.kk-price {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   padding: 3px 6px;
-  margin-right: -6px;
+  margin: -3px -6px;
   border: 1px dashed transparent;
   border-radius: 8px;
   background: none;
   font: inherit;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   color: inherit;
   cursor: pointer;
 }
-.kk-plan-price svg {
+.kk-price svg {
+  flex: none;
   opacity: 0.35;
 }
-.kk-plan-price:hover {
+.kk-price:hover,
+.kk-price:focus-visible {
   border-color: var(--border);
   background: var(--kk-hover);
 }
-.kk-plan-price:hover svg {
+.kk-price:hover svg {
   opacity: 0.8;
 }
-.kk-plan-price.is-empty {
+.kk-price.is-empty {
   font-size: 0.82rem;
   font-weight: 600;
   color: var(--kk-link);
 }
-.kk-plan-price-note {
+.kk-price-note {
   display: block;
+  margin-top: 4px;
   font-size: 0.74rem;
   color: var(--muted);
 }
-.kk-plan-price-form {
+.kk-price-form {
   display: grid;
-  justify-items: end;
   gap: 4px;
 }
-.kk-plan-price-row {
+.kk-price-form.is-end {
+  justify-items: end;
+}
+.kk-price-form.is-start {
+  justify-items: start;
+}
+.kk-price-row {
   display: flex;
   align-items: center;
   gap: 2px;
 }
-.kk .kk-plan-price-row input:not([type='checkbox']):not([type='file']) {
-  width: 96px;
+:is(.kk, .kk-portal) .kk-price-row input:not([type='checkbox']):not([type='file']) {
+  width: 104px;
   height: 34px;
   padding: 4px 8px;
   text-align: right;
 }
-.kk-plan-price-sync {
+.kk-price-sync {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   margin-top: 6px;
   font-size: 0.78rem;
   font-weight: 600;
+  white-space: nowrap;
   color: var(--muted);
   cursor: pointer;
 }
-.kk-plan-price-form .kk-plan-price-sync {
+.kk-price-form .kk-price-sync {
   margin-top: 0;
 }
-.kk-plan-price-form .kk-form-error {
-  max-width: 180px;
+.kk-price-form .kk-form-error {
+  max-width: 200px;
   font-size: 0.76rem;
+}
+.kk-price-form.is-end .kk-form-error {
   text-align: right;
 }
 .kk-receive-banner {
