@@ -7,7 +7,8 @@ import { Modal } from './ui/Modal'
 import { CategoryPicker, Field, QtyStepper, SelectWithCreate } from './ui/common'
 import { friendlyError } from './lib/api'
 import { parseNumber } from './lib/csv'
-import { normalize, safeUrl } from './lib/format'
+import { fmtPrice, normalize, safeUrl } from './lib/format'
+import { PRICE_UNITS, packOf, packPrice, supportsPriceUnit } from './lib/price'
 
 const text = (v) => (v === null || v === undefined ? '' : String(v))
 
@@ -16,6 +17,8 @@ export default function ComponentForm({ initial, onClose, onSaved }) {
   const { allComponents: components, locations, levels, levelFor, createLocation, reload } = useData()
   const toast = useToast()
   const editing = Boolean(initial)
+  const unitReady = supportsPriceUnit(components) // database đã chạy sql/14_price_unit.sql
+  const initPack = packOf(initial)
 
   const [f, setF] = useState({
     part_number: text(initial?.part_number),
@@ -26,7 +29,10 @@ export default function ComponentForm({ initial, onClose, onSaved }) {
     manufacturer: text(initial?.manufacturer),
     // Có mức chung thì để trống = theo mặc định; database cũ thì vẫn là một con số
     min_stock: levels.ready ? text(initial?.min_stock_own) : text(initial?.min_stock ?? 0),
-    unit_price: text(initial?.unit_price),
+    // Món tính theo hộp / bộ: ô đơn giá là giá một hộp, lưu xuống thì chia ra giá một cái
+    unit_price: text(packPrice(initial?.unit_price, initPack)),
+    price_unit: initPack?.unit ?? '',
+    price_qty: text(initPack?.qty ?? ''),
     datasheet_url: text(initial?.datasheet_url),
     image_url: text(initial?.image_url),
     notes: text(initial?.notes),
@@ -47,6 +53,14 @@ export default function ComponentForm({ initial, onClose, onSaved }) {
   const inherited = levelFor(f.category_id)
   const defaultHint = `Để trống thì theo ${inherited.category ? `danh mục ${inherited.category.name}` : 'mức chung'}: báo sắp hết khi tồn dưới ${inherited.value}.`
 
+  // Gợi ý dưới ô đơn giá: món theo hộp thì cho thấy giá quy ra một cái
+  const typedPrice = f.unit_price.trim() === '' ? NaN : parseNumber(f.unit_price)
+  const typedQty = parseNumber(f.price_qty)
+  const unitHint =
+    f.price_unit && typedPrice >= 0 && Number.isInteger(typedQty) && typedQty >= 1
+      ? `Quy ra khoảng ${fmtPrice(typedPrice / typedQty)} một cái.`
+      : 'Dùng để tính giá trị kho.'
+
   function validate() {
     const e = {}
     if (!f.part_number.trim()) e.part_number = 'Nhập mã linh kiện.'
@@ -56,6 +70,10 @@ export default function ComponentForm({ initial, onClose, onSaved }) {
     if (f.unit_price.trim() !== '') {
       const p = parseNumber(f.unit_price)
       if (Number.isNaN(p) || p < 0) e.unit_price = 'Nhập số tiền hợp lệ, ví dụ 3500 hoặc 0,35.'
+    }
+    if (f.price_unit) {
+      const q = parseNumber(f.price_qty)
+      if (!Number.isInteger(q) || q < 1) e.price_qty = `Nhập số cái trong một ${f.price_unit}, vd 840.`
     }
     if (f.datasheet_url.trim() && !safeUrl(f.datasheet_url)) e.datasheet_url = 'Link phải bắt đầu bằng http:// hoặc https://'
     if (f.image_url.trim() && !safeUrl(f.image_url)) e.image_url = 'Link phải bắt đầu bằng http:// hoặc https://'
@@ -79,7 +97,8 @@ export default function ComponentForm({ initial, onClose, onSaved }) {
       package: f.package.trim() || null,
       manufacturer: f.manufacturer.trim() || null,
       min_stock: f.min_stock === '' ? (levels.ready ? null : 0) : parseNumber(f.min_stock),
-      unit_price: f.unit_price.trim() === '' ? null : parseNumber(f.unit_price),
+      unit_price: f.unit_price.trim() === '' ? null : parseNumber(f.unit_price) / (f.price_unit ? parseNumber(f.price_qty) : 1),
+      ...(unitReady ? { price_unit: f.price_unit || null, price_qty: f.price_unit ? parseNumber(f.price_qty) : null } : {}),
       datasheet_url: f.datasheet_url.trim() || null,
       image_url: f.image_url.trim() || null,
       notes: f.notes.trim() || null,
@@ -193,9 +212,36 @@ export default function ComponentForm({ initial, onClose, onSaved }) {
             onChange={set('min_stock')}
           />
         </Field>
-        <Field label="Đơn giá (đ)" htmlFor="cf-price" error={errors.unit_price} hint="Dùng để tính giá trị kho.">
+        <Field
+          label={f.price_unit ? `Đơn giá một ${f.price_unit} (đ)` : 'Đơn giá (đ)'}
+          htmlFor="cf-price"
+          error={errors.unit_price}
+          hint={unitHint}
+        >
           <input id="cf-price" inputMode="decimal" value={f.unit_price} onChange={set('unit_price')} />
         </Field>
+
+        {unitReady && (
+          <>
+            <Field label="Giá tính theo" htmlFor="cf-punit" hint="Món bán theo hộp, bộ, combo... thì chọn ở đây.">
+              <select id="cf-punit" value={f.price_unit} onChange={set('price_unit')}>
+                <option value="">Từng cái</option>
+                {PRICE_UNITS.map((u) => (
+                  <option key={u} value={u}>
+                    Theo {u}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {f.price_unit ? (
+              <Field label={`Số cái trong một ${f.price_unit} *`} htmlFor="cf-pqty" error={errors.price_qty} hint="Số lượng tồn kho vẫn đếm theo cái.">
+                <input id="cf-pqty" inputMode="numeric" value={f.price_qty} placeholder="Vd: 840" onChange={set('price_qty')} />
+              </Field>
+            ) : (
+              <span aria-hidden="true" />
+            )}
+          </>
+        )}
 
         <Field label="Link datasheet" htmlFor="cf-ds" error={errors.datasheet_url} className="kk-span-2">
           <input id="cf-ds" type="url" value={f.datasheet_url} placeholder="https://" onChange={set('datasheet_url')} />

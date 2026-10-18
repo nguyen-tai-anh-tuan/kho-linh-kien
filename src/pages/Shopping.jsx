@@ -5,6 +5,7 @@ import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
 import PurchasePlan, { PlanForm, usePurchaseItems } from './PurchasePlan'
 import { ComponentPrice } from '../ui/PriceEdit'
+import { packOf } from '../lib/price'
 import { useBuyList } from '../data/useBuyList'
 import { useTx } from '../TxContext'
 import { useShell } from '../ShellContext'
@@ -483,6 +484,11 @@ export default function ShoppingPage() {
                         >
                           {fmtNum(need(c))}
                         </span>
+                        {packOf(c)?.qty > 1 && (
+                          <small className="kk-min-note kk-pack-note">
+                            khoảng {fmtNum(Math.ceil(need(c) / packOf(c).qty))} {packOf(c).unit}
+                          </small>
+                        )}
                       </td>
                       <td data-label="Đơn giá" className="kk-col-price is-num">
                         <ComponentPrice comp={c} />

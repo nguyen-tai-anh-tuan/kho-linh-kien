@@ -25,11 +25,12 @@ import { useToast } from '../ui/Toast'
 import { Modal } from '../ui/Modal'
 import { ConfirmDialog } from '../ui/dialogs'
 import { InlinePrice } from '../ui/PriceEdit'
+import { fmtUnitPrice, packOf, packPrice } from '../lib/price'
 import { StatCard } from '../ui/stats'
 import { CategoryChip, CategoryPicker, ComponentPicker, EmptyState, Field, QtyStepper, SelectWithCreate, Skeleton } from '../ui/common'
 import { friendlyError, isMissingSchema, mustChange } from '../lib/api'
 import { downloadCSV, parseNumber } from '../lib/csv'
-import { fmtMoneyFull, fmtNum, fmtPrice, normalize, safeUrl } from '../lib/format'
+import { fmtMoneyFull, fmtNum, normalize, safeUrl } from '../lib/format'
 
 const PAGE_SIZE = 10
 const STATUS = {
@@ -160,7 +161,7 @@ export default function PurchasePlan({ items }) {
       message:
         price === null
           ? `Đã xóa đơn giá dự kiến của ${r.part}.`
-          : `Đã lưu đơn giá ${fmtPrice(price)} cho ${r.part}${inStock ? ', cập nhật luôn vào kho' : ''}.`,
+          : `Đã lưu đơn giá ${fmtUnitPrice(price, packOf(r.comp))} cho ${r.part}${inStock ? ', cập nhật luôn vào kho' : ''}.`,
     })
   }
 
@@ -387,10 +388,11 @@ export default function PurchasePlan({ items }) {
                             label={r.part}
                             option={r.comp ? { label: 'Cập nhật vào kho', defaultChecked: true } : undefined}
                             onSave={(price, toStock) => changePrice(r, price, toStock)}
+                            pack={packOf(r.comp)}
                             note={
                               r.stockPrice !== null && r.price !== null && r.price !== r.stockPrice ? (
                                 <small className="kk-price-note" title="Đơn giá dự kiến khác với đơn giá đang lưu trong kho">
-                                  Kho: {fmtPrice(r.stockPrice)}
+                                  Kho: {fmtUnitPrice(r.stockPrice, packOf(r.comp))}
                                 </small>
                               ) : null
                             }
@@ -550,7 +552,7 @@ export function PlanForm({ initial, preset, onSaved, onClose }) {
     package: text(seed?.package),
     manufacturer: text(seed?.manufacturer),
     quantity: seed?.quantity ?? 1,
-    unit_price: text(seed?.unit_price),
+    unit_price: text(packPrice(seed?.unit_price, packOf(componentsById.get(seed?.component_id)))),
     shop_url: text(seed?.shop_url),
     note: text(seed?.note),
     project_id: seed?.project_id ?? null,
@@ -565,6 +567,7 @@ export function PlanForm({ initial, preset, onSaved, onClose }) {
   const sameCode =
     mode === 'new' && f.part_number.trim() ? allComponents.find((c) => normalize(c.part_number) === normalize(f.part_number)) : null
   const stockComp = mode === 'stock' ? (f.component_id ? componentsById.get(f.component_id) : null) : sameCode
+  const pack = packOf(stockComp)
 
   async function submit(ev) {
     ev.preventDefault()
@@ -575,8 +578,9 @@ export function PlanForm({ initial, preset, onSaved, onClose }) {
     if (mode === 'new' && !f.part_number.trim()) e.part_number = 'Nhập mã linh kiện.'
     if (mode === 'new' && !sameCode && !f.name.trim()) e.name = 'Nhập tên linh kiện.'
     if (!(Number(f.quantity) >= 1)) e.quantity = 'Nhập số lượng lớn hơn 0.'
-    const price = f.unit_price.trim() === '' ? null : parseNumber(f.unit_price)
-    if (price !== null && (Number.isNaN(price) || price < 0)) e.unit_price = 'Nhập số tiền hợp lệ, ví dụ 3500.'
+    const typed = f.unit_price.trim() === '' ? null : parseNumber(f.unit_price)
+    if (typed !== null && (Number.isNaN(typed) || typed < 0)) e.unit_price = 'Nhập số tiền hợp lệ, ví dụ 3500.'
+    const price = typed === null || !pack ? typed : typed / pack.qty // luôn lưu giá một cái
     if (f.shop_url.trim() && !safeUrl(f.shop_url)) e.shop_url = 'Link phải bắt đầu bằng http:// hoặc https://'
     setErrors(e)
     setFormError('')
@@ -697,17 +701,22 @@ export function PlanForm({ initial, preset, onSaved, onClose }) {
           </>
         )}
 
-        <Field label="Số lượng cần mua *" htmlFor="pl-qty" error={errors.quantity}>
+        <Field
+          label="Số lượng cần mua (cái) *"
+          htmlFor="pl-qty"
+          error={errors.quantity}
+          hint={pack && pack.qty > 1 ? `1 ${pack.unit} = ${fmtNum(pack.qty)} cái. Số này khoảng ${fmtNum(Math.ceil(Number(f.quantity) / pack.qty))} ${pack.unit}.` : undefined}
+        >
           <QtyStepper id="pl-qty" value={f.quantity} min={1} label="Số lượng cần mua" invalid={Boolean(errors.quantity)} onChange={(v) => setF((s) => ({ ...s, quantity: v }))} />
         </Field>
         <Field
-          label="Đơn giá (đ)"
+          label={pack ? `Đơn giá một ${pack.unit} (đ)` : 'Đơn giá (đ)'}
           htmlFor="pl-price"
           error={errors.unit_price}
           hint={
             stockComp
               ? Number(stockComp.unit_price) > 0
-                ? `Đơn giá trong kho: ${fmtPrice(stockComp.unit_price)}. Để trống thì dùng giá này.`
+                ? `Đơn giá trong kho: ${fmtUnitPrice(stockComp.unit_price, pack)}. Để trống thì dùng giá này.`
                 : 'Linh kiện này chưa có đơn giá trong kho.'
               : undefined
           }
@@ -716,7 +725,7 @@ export function PlanForm({ initial, preset, onSaved, onClose }) {
             id="pl-price"
             inputMode="decimal"
             value={f.unit_price}
-            placeholder={Number(stockComp?.unit_price) > 0 ? String(Number(stockComp.unit_price)) : undefined}
+            placeholder={Number(stockComp?.unit_price) > 0 ? String(packPrice(stockComp.unit_price, pack)) : undefined}
             onChange={set('unit_price')}
           />
           {stockComp && (

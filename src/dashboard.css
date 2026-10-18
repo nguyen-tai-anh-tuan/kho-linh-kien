@@ -3739,3 +3739,26 @@ button.kk-plan-status:hover:not(:disabled) {
 .kk-buy-tabs .kk-badge {
   margin-left: 0;
 }
+
+/* Đơn giá theo hộp / bộ / combo */
+.kk-price-per {
+  margin-left: -2px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.kk-price-unit-hint {
+  font-size: 0.74rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.kk-price-static {
+  white-space: nowrap;
+}
+.kk-table .kk-pack-note {
+  display: block;
+}
+/* Số tiền không bị ngắt giữa chừng ("90.972.000 / đ") */
+.kk-table .kk-col-price {
+  white-space: nowrap;
+}
