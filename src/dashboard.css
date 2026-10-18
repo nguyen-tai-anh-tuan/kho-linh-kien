@@ -3535,6 +3535,75 @@ button.kk-plan-status:hover:not(:disabled) {
   width: 1%;
   white-space: nowrap;
 }
+/* Sửa đơn giá ngay trong danh sách mua trước */
+.kk-plan-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 6px;
+  margin-right: -6px;
+  border: 1px dashed transparent;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+  cursor: pointer;
+}
+.kk-plan-price svg {
+  opacity: 0.35;
+}
+.kk-plan-price:hover {
+  border-color: var(--border);
+  background: var(--kk-hover);
+}
+.kk-plan-price:hover svg {
+  opacity: 0.8;
+}
+.kk-plan-price.is-empty {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--kk-link);
+}
+.kk-plan-price-note {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+.kk-plan-price-form {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+}
+.kk-plan-price-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.kk .kk-plan-price-row input:not([type='checkbox']):not([type='file']) {
+  width: 96px;
+  height: 34px;
+  padding: 4px 8px;
+  text-align: right;
+}
+.kk-plan-price-sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.kk-plan-price-form .kk-plan-price-sync {
+  margin-top: 0;
+}
+.kk-plan-price-form .kk-form-error {
+  max-width: 180px;
+  font-size: 0.76rem;
+  text-align: right;
+}
 .kk-receive-banner {
   margin-bottom: 14px;
 }
