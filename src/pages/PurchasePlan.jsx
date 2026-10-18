@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardCopy,
+  Coins,
   Download,
   ExternalLink,
   Loader2,
@@ -13,6 +14,7 @@ import {
   Pencil,
   Plus,
   Save,
+  ShoppingCart,
   Trash2,
   Truck,
 } from 'lucide-react'
@@ -23,6 +25,7 @@ import { useToast } from '../ui/Toast'
 import { Modal } from '../ui/Modal'
 import { ConfirmDialog } from '../ui/dialogs'
 import { InlinePrice } from '../ui/PriceEdit'
+import { StatCard } from '../ui/stats'
 import { CategoryChip, CategoryPicker, ComponentPicker, EmptyState, Field, QtyStepper, SelectWithCreate, Skeleton } from '../ui/common'
 import { friendlyError, isMissingSchema, mustChange } from '../lib/api'
 import { downloadCSV, parseNumber } from '../lib/csv'
@@ -37,7 +40,21 @@ const FILTERS = [
   { key: '', label: 'Tất cả' },
   { key: 'todo', label: 'Cần mua' },
   { key: 'ordered', label: 'Đã đặt hàng' },
+  { key: 'noprice', label: 'Chưa có giá' },
 ]
+const matches = (r, key) => !key || (key === 'noprice' ? r.price === null : r.item.status === key)
+
+/** Tổng tiền của một nhóm món: chỉ cộng món đã có đơn giá, đếm riêng món chưa có giá */
+function costOf(list) {
+  let cost = 0
+  let priced = 0
+  for (const r of list) {
+    if (r.price === null) continue
+    cost += r.price * r.item.quantity
+    priced++
+  }
+  return { cost, priced, count: list.length, unpriced: list.length - priced }
+}
 
 /** Danh sách mua trước. missing = database chưa chạy sql/13_purchase_list.sql. */
 export function usePurchaseItems(version) {
@@ -103,7 +120,19 @@ export default function PurchasePlan({ items }) {
   const [busyId, setBusyId] = useState(null)
 
   const all = useMemo(() => (items.rows ?? []).map((it) => ({ item: it, ...describe(it, componentsById) })), [items.rows, componentsById])
-  const rows = filter ? all.filter((r) => r.item.status === filter) : all
+  const rows = all.filter((r) => matches(r, filter))
+  const sum = useMemo(
+    () => ({
+      all: costOf(all),
+      todo: costOf(all.filter((r) => r.item.status === 'todo')),
+      ordered: costOf(all.filter((r) => r.item.status === 'ordered')),
+    }),
+    [all],
+  )
+  const pickFilter = (key) => {
+    setFilter(key)
+    setPage(0)
+  }
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
   const safePage = Math.min(page, pageCount - 1)
   const pageRows = rows.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)
@@ -198,8 +227,51 @@ export default function PurchasePlan({ items }) {
     )
   }
 
+  const pct = sum.all.count > 0 ? Math.round((sum.all.priced / sum.all.count) * 100) : 0
+  const moneyOf = (g) => (g.priced > 0 ? fmtMoneyFull(g.cost) : '—')
+  const missingNote = (g) => (g.unpriced > 0 ? `, ${fmtNum(g.unpriced)} món chưa có giá` : '')
+
   return (
     <>
+      {all.length > 0 && (
+        <section className="kk-stats kk-stats-3" aria-label="Chi phí ước tính">
+          <StatCard
+            Icon={Coins}
+            label="Tổng chi phí ước tính"
+            value={moneyOf(sum.all)}
+            title={`Đơn giá × số lượng của ${fmtNum(sum.all.priced)} món đã có giá`}
+            note={
+              sum.all.unpriced > 0
+                ? `Đã có giá ${fmtNum(sum.all.priced)}/${fmtNum(sum.all.count)} món, bấm để điền tiếp`
+                : `Đủ giá cho ${fmtNum(sum.all.count)} món`
+            }
+            onClick={sum.all.unpriced > 0 && filter !== 'noprice' ? () => pickFilter('noprice') : undefined}
+          >
+            <span
+              className={`kk-stat-meter ${pct === 100 ? 'is-full' : ''}`}
+              role="img"
+              aria-label={`Đã có đơn giá ${fmtNum(sum.all.priced)} trên ${fmtNum(sum.all.count)} món`}
+            >
+              <i style={{ width: `${pct}%` }} />
+            </span>
+          </StatCard>
+          <StatCard
+            Icon={ShoppingCart}
+            label="Còn phải mua"
+            value={moneyOf(sum.todo)}
+            note={`${fmtNum(sum.todo.count)} món chưa đặt${missingNote(sum.todo)}`}
+            onClick={sum.todo.count > 0 && filter !== 'todo' ? () => pickFilter('todo') : undefined}
+          />
+          <StatCard
+            Icon={Truck}
+            label="Đã đặt hàng"
+            value={moneyOf(sum.ordered)}
+            note={`${fmtNum(sum.ordered.count)} món đang chờ về${missingNote(sum.ordered)}`}
+            onClick={sum.ordered.count > 0 && filter !== 'ordered' ? () => pickFilter('ordered') : undefined}
+          />
+        </section>
+      )}
+
       <div className="kk-card kk-toolbar">
         <div className="kk-pills" role="group" aria-label="Lọc theo trạng thái">
           {FILTERS.map((f) => (
@@ -208,12 +280,9 @@ export default function PurchasePlan({ items }) {
               type="button"
               className={`kk-pill ${filter === f.key ? 'is-on' : ''}`}
               aria-pressed={filter === f.key}
-              onClick={() => {
-                setFilter(f.key)
-                setPage(0)
-              }}
+              onClick={() => pickFilter(f.key)}
             >
-              {f.label} ({fmtNum(f.key ? all.filter((r) => r.item.status === f.key).length : all.length)})
+              {f.label} ({fmtNum(all.filter((r) => matches(r, f.key)).length)})
             </button>
           ))}
         </div>
@@ -252,7 +321,10 @@ export default function PurchasePlan({ items }) {
             )}
           </EmptyState>
         ) : rows.length === 0 ? (
-          <EmptyState title="Không có món nào ở trạng thái này" text="Chọn bộ lọc khác để xem." />
+          <EmptyState
+            title={filter === 'noprice' ? 'Món nào cũng đã có đơn giá' : 'Không có món nào ở trạng thái này'}
+            text="Chọn bộ lọc khác để xem."
+          />
         ) : (
           <>
             <div className="kk-table-scroll">
