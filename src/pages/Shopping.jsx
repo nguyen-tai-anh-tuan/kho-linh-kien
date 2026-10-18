@@ -5,7 +5,7 @@ import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
 import PurchasePlan, { PlanForm, usePurchaseItems } from './PurchasePlan'
 import { ComponentPrice } from '../ui/PriceEdit'
-import { packOf } from '../lib/price'
+import { packOf, packPrice } from '../lib/price'
 import { useBuyList } from '../data/useBuyList'
 import { useTx } from '../TxContext'
 import { useShell } from '../ShellContext'
@@ -13,7 +13,8 @@ import { useToast } from '../ui/Toast'
 import { CategoryChip, EmptyState, Skeleton, StatusChip, StockBar } from '../ui/common'
 import { CategoryFilter } from '../ui/CategoryMenu'
 import { friendlyError, mustChange } from '../lib/api'
-import { downloadCSV } from '../lib/csv'
+import { datedName, stockText, stockTone } from '../lib/xlsx'
+import { useXlsxExport } from '../ui/useXlsxExport'
 import { fmtMoneyFull, fmtNum, normalize } from '../lib/format'
 import { subtreeIds } from '../lib/tree'
 
@@ -46,6 +47,7 @@ export default function ShoppingPage() {
   const [selected, setSelected] = useState(() => new Set())
   const [planDialog, setPlanDialog] = useState(null) // món điền sẵn cho form "Thêm món cần mua"
   const [adding, setAdding] = useState(false)
+  const xlsx = useXlsxExport()
 
   function setParam(key, value) {
     setParams(
@@ -172,22 +174,33 @@ export default function ShoppingPage() {
   const priced = rows.filter((c) => Number(c.unit_price) > 0)
   const cost = priced.reduce((sum, c) => sum + need(c) * Number(c.unit_price), 0)
 
-  function exportCsv() {
-    const header = ['part_number', 'name', 'category', 'package', 'manufacturer', 'total_quantity', 'min_stock', 'project_need', 'need', 'unit_price', 'amount']
-    const body = rows.map((c) => [
-      c.part_number,
-      c.name,
-      categoriesById.get(c.category_id)?.path ?? c.category_name,
-      c.package,
-      c.manufacturer,
-      c.total_quantity,
-      c.min_stock,
-      bomByComponent.get(c.id)?.total ?? 0,
-      need(c),
-      c.unit_price,
-      Number(c.unit_price) > 0 ? need(c) * Number(c.unit_price) : '',
-    ])
-    downloadCSV(`can-mua-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...body])
+  function exportXlsx() {
+    xlsx.run({
+      filename: datedName('can-mua'),
+      title: 'Linh kiện cần mua (theo tồn kho)',
+      subtitle: hasFilter ? 'Theo bộ lọc đang chọn' : 'Hết hàng, sắp hết và thiếu cho dự án',
+      sheet: 'Cần mua',
+      rows,
+      columns: [
+        { header: 'Mã linh kiện', value: (c) => c.part_number, width: 26, wrap: true },
+        { header: 'Tên', value: (c) => c.name, width: 34, wrap: true },
+        { header: 'Danh mục', value: (c) => categoriesById.get(c.category_id)?.path ?? c.category_name, width: 28, wrap: true },
+        { header: 'Package', value: (c) => c.package, width: 13 },
+        { header: 'Tồn kho', value: (c) => c.total_quantity, type: 'int', width: 10 },
+        { header: 'Tối thiểu', value: (c) => c.min_stock, type: 'int', width: 10 },
+        { header: 'Dự án cần', value: (c) => bomByComponent.get(c.id)?.total ?? null, type: 'int', width: 11 },
+        { header: 'Nên mua (cái)', value: (c) => need(c), type: 'int', width: 13, total: true },
+        { header: 'Tính theo', value: (c) => (packOf(c) ? `${packOf(c).unit} (${fmtNum(packOf(c).qty)} cái)` : 'cái'), width: 15 },
+        { header: 'Đơn giá', value: (c) => (Number(c.unit_price) > 0 ? packPrice(c.unit_price, packOf(c)) : null), type: 'money', width: 14 },
+        { header: 'Thành tiền', value: (c) => (Number(c.unit_price) > 0 ? need(c) * Number(c.unit_price) : null), type: 'money', width: 16, total: true },
+        { header: 'Trạng thái', value: (c) => stockText(c.status), tone: (c) => stockTone(c.status), width: 12 },
+        {
+          header: 'Danh sách mua trước',
+          value: (c) => (planned.get(c.id) ? `${planned.get(c.id).ordered ? 'Đã đặt' : 'Đã lên DS'} ${fmtNum(planned.get(c.id).quantity)}` : ''),
+          width: 18,
+        },
+      ],
+    })
   }
 
   async function copyList() {
@@ -196,7 +209,7 @@ export default function ShoppingPage() {
       await navigator.clipboard.writeText(text)
       toast.push({ message: `Đã chép ${fmtNum(rows.length)} dòng. Dán vào tin nhắn hoặc ô tìm kiếm của nơi bán.` })
     } catch {
-      toast.push({ tone: 'error', message: 'Trình duyệt không cho chép. Bạn dùng nút Xuất CSV nhé.' })
+      toast.push({ tone: 'error', message: 'Trình duyệt không cho chép. Bạn dùng nút Xuất Excel nhé.' })
     }
   }
 
@@ -284,9 +297,9 @@ export default function ShoppingPage() {
             <ClipboardCopy size={18} />
             Chép danh sách
           </button>
-          <button type="button" className="kk-btn kk-btn-outline" onClick={exportCsv} disabled={rows.length === 0}>
+          <button type="button" className="kk-btn kk-btn-outline" onClick={exportXlsx} disabled={rows.length === 0 || xlsx.busy}>
             <Download size={18} />
-            Xuất CSV
+            {xlsx.busy ? 'Đang xuất…' : 'Xuất Excel'}
           </button>
         </div>
       </div>

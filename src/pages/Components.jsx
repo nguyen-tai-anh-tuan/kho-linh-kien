@@ -17,10 +17,12 @@ import { useData } from '../data/DataContext'
 import { useTx } from '../TxContext'
 import { useShell } from '../ShellContext'
 import { CategoryChip, EmptyState, Skeleton, StatusChip, StockBar } from '../ui/common'
-import { downloadCSV } from '../lib/csv'
+import { datedName, stockText, stockTone } from '../lib/xlsx'
+import { useXlsxExport } from '../ui/useXlsxExport'
 import { fmtMoneyFull, fmtNum, normalize } from '../lib/format'
 import { StockStatCards, stockStats } from '../ui/stats'
 import { ComponentPrice } from '../ui/PriceEdit'
+import { packOf, packPrice } from '../lib/price'
 import { CategoryFilter } from '../ui/CategoryMenu'
 import { subtreeIds } from '../lib/tree'
 
@@ -59,6 +61,7 @@ export default function ComponentsPage() {
   const [sort, setSort] = useState({ key: 'part_number', dir: 'asc' })
   const [page, setPage] = useState(0)
   const [selected, setSelected] = useState(() => new Set())
+  const xlsx = useXlsxExport()
 
   const q = params.get('q') ?? ''
   const cat = params.get('cat') ?? ''
@@ -165,43 +168,32 @@ export default function ComponentsPage() {
     setSort((s) => (s.key === key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }))
   }
 
-  function exportCsv() {
+  function exportXlsx() {
     const list = selected.size > 0 ? sorted.filter((c) => selected.has(c.id)) : sorted
-    const header = [
-      'part_number',
-      'name',
-      'category',
-      'value',
-      'package',
-      'manufacturer',
-      'min_stock',
-      'unit_price',
-      'price_unit',
-      'price_qty',
-      'total_quantity',
-      'stock_value',
-      'locations',
-      'datasheet_url',
-      'notes',
-    ]
-    const body = list.map((c) => [
-      c.part_number,
-      c.name,
-      categoriesById.get(c.category_id)?.path ?? c.category_name,
-      c.value,
-      c.package,
-      c.manufacturer,
-      c.min_stock,
-      c.unit_price,
-      c.price_unit ?? '',
-      c.price_qty ?? '',
-      c.total_quantity,
-      Number(c.unit_price) > 0 ? c.stock_value : '',
-      (stockByComponent.get(c.id) ?? []).map((s) => `${s.path}: ${s.quantity}`).join('; '),
-      c.datasheet_url,
-      c.notes,
-    ])
-    downloadCSV(`kho-linh-kien-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...body])
+    xlsx.run({
+      filename: datedName('kho-linh-kien'),
+      title: arc ? 'Linh kiện ngừng dùng' : 'Danh sách linh kiện',
+      subtitle: selected.size > 0 ? `${fmtNum(list.length)} mục đã chọn` : hasFilter ? 'Theo bộ lọc đang chọn' : 'Toàn bộ kho',
+      sheet: 'Linh kiện',
+      rows: list,
+      columns: [
+        { header: 'Mã linh kiện', value: (c) => c.part_number, width: 26, wrap: true },
+        { header: 'Tên', value: (c) => c.name, width: 34, wrap: true },
+        { header: 'Danh mục', value: (c) => categoriesById.get(c.category_id)?.path ?? c.category_name, width: 30, wrap: true },
+        { header: 'Giá trị', value: (c) => c.value, width: 12 },
+        { header: 'Package', value: (c) => c.package, width: 13 },
+        { header: 'Hãng', value: (c) => c.manufacturer, width: 14 },
+        { header: 'Tồn kho', value: (c) => c.total_quantity, type: 'int', width: 11, total: true },
+        { header: 'Tối thiểu', value: (c) => c.min_stock, type: 'int', width: 11 },
+        { header: 'Trạng thái', value: (c) => stockText(c.status), tone: (c) => stockTone(c.status), width: 12 },
+        { header: 'Đơn giá', value: (c) => (Number(c.unit_price) > 0 ? packPrice(c.unit_price, packOf(c)) : null), type: 'money', width: 14 },
+        { header: 'Tính theo', value: (c) => (packOf(c) ? `${packOf(c).unit} (${fmtNum(packOf(c).qty)} cái)` : 'cái'), width: 15 },
+        { header: 'Giá trị tồn', value: (c) => (Number(c.unit_price) > 0 ? Number(c.stock_value) : null), type: 'money', width: 16, total: true },
+        { header: 'Vị trí', value: (c) => (stockByComponent.get(c.id) ?? []).map((x) => `${x.path}: ${x.quantity}`).join('\n'), width: 30, wrap: true },
+        { header: 'Datasheet', value: (c) => c.datasheet_url, type: 'link', linkText: 'Mở datasheet', width: 15 },
+        { header: 'Ghi chú', value: (c) => c.notes, width: 30, wrap: true },
+      ],
+    })
   }
 
   if (error) {
@@ -241,9 +233,9 @@ export default function ComponentsPage() {
               </button>
             </>
           )}
-          <button type="button" className="kk-btn kk-btn-outline" onClick={exportCsv} disabled={components.length === 0}>
+          <button type="button" className="kk-btn kk-btn-outline" onClick={exportXlsx} disabled={components.length === 0 || xlsx.busy}>
             <Download size={18} />
-            Xuất CSV
+            {xlsx.busy ? 'Đang xuất…' : 'Xuất Excel'}
           </button>
         </div>
       </div>
@@ -319,9 +311,9 @@ export default function ComponentsPage() {
               Nhập / xuất các mục này
             </button>
           )}
-          <button type="button" className="kk-btn kk-btn-soft kk-btn-sm" onClick={exportCsv}>
+          <button type="button" className="kk-btn kk-btn-soft kk-btn-sm" onClick={exportXlsx} disabled={xlsx.busy}>
             <Download size={16} />
-            Xuất CSV
+            Xuất Excel
           </button>
           <button type="button" className="kk-btn kk-btn-ghost kk-btn-sm" onClick={() => setSelected(new Set())}>
             <X size={16} />

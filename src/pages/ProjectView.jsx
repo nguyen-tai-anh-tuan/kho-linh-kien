@@ -20,7 +20,8 @@ import { useShell } from '../ShellContext'
 import { EmptyState, QtyStepper, Skeleton } from '../ui/common'
 import { friendlyError } from '../lib/api'
 import { fetchBomLines } from '../lib/bom'
-import { downloadCSV } from '../lib/csv'
+import { useXlsxExport } from '../ui/useXlsxExport'
+import { packOf, packPrice } from '../lib/price'
 import { fmtDateTime, fmtMoneyFull, fmtNum, fmtPrice, normalize } from '../lib/format'
 import { ProjectGallery, useProjectImages } from './ProjectImages'
 import { StageBar } from './ProjectStage'
@@ -116,41 +117,35 @@ export default function ProjectViewPage() {
 
   const percent = totals.need > 0 ? Math.round((totals.issued / totals.need) * 100) : 0
 
-  function exportCsv() {
-    const header = [
-      'danh_muc',
-      'part_number',
-      'ten',
-      'package',
-      'vi_tri',
-      'moi_bo_can',
-      'tong_can',
-      'da_xuat',
-      'con_phai_xuat',
-      'ton_kho',
-      'kho_thieu',
-      'don_gia',
-      'thanh_tien',
-    ]
-    const body = groups.flatMap((g) =>
-      g.rows.map((r) => [
-        g.name,
-        r.comp.part_number,
-        r.comp.name,
-        r.comp.package,
-        r.where,
-        r.per,
-        r.total,
-        r.issued,
-        r.left,
-        r.have,
-        r.short,
-        r.price ?? '',
-        r.price !== null ? r.total * r.price : '',
-      ]),
-    )
+  const xlsx = useXlsxExport()
+  function exportXlsx() {
     const slug = normalize(`${project.code} ${project.name}`).replace(/[^a-z0-9]+/g, '-')
-    downloadCSV(`bom-${slug}.csv`, [header, ...body])
+    xlsx.run({
+      filename: `bom-${slug}.xlsx`,
+      title: `BOM: ${project.code ? `${project.code} · ` : ''}${project.name}`,
+      subtitle: `Tính cho ${fmtNum(n)} bộ`,
+      sheet: 'BOM',
+      rows: groups.flatMap((g) => [{ group: `${g.name} (${fmtNum(g.rows.length)} mã)` }, ...g.rows]),
+      columns: [
+        { header: 'Mã linh kiện', value: (r) => r.comp.part_number, width: 26, wrap: true },
+        { header: 'Tên', value: (r) => r.comp.name, width: 32, wrap: true },
+        { header: 'Package', value: (r) => r.comp.package, width: 13 },
+        { header: 'Vị trí trong kho', value: (r) => r.where, width: 28, wrap: true },
+        { header: 'Mỗi bộ', value: (r) => r.per, type: 'int', width: 9 },
+        { header: 'Tổng cần', value: (r) => r.total, type: 'int', width: 10, total: true },
+        ...(tracked
+          ? [
+              { header: 'Đã xuất', value: (r) => r.issued, type: 'int', width: 10, total: true },
+              { header: 'Còn phải xuất', value: (r) => r.left, type: 'int', width: 12, total: true },
+            ]
+          : []),
+        { header: 'Tồn kho', value: (r) => r.have, type: 'int', width: 10 },
+        { header: 'Kho thiếu', value: (r) => r.short || null, type: 'int', tone: (r) => (r.short > 0 ? 'danger' : undefined), width: 10, total: true },
+        { header: 'Đơn giá', value: (r) => packPrice(r.price, packOf(r.comp)), type: 'money', width: 14 },
+        { header: 'Tính theo', value: (r) => (packOf(r.comp) ? `${packOf(r.comp).unit} (${fmtNum(packOf(r.comp).qty)} cái)` : 'cái'), width: 15 },
+        { header: 'Thành tiền', value: (r) => (r.price !== null ? r.total * r.price : null), type: 'money', width: 16, total: true },
+      ],
+    })
   }
 
   if (error) {
@@ -203,9 +198,9 @@ export default function ProjectViewPage() {
             <label htmlFor="pv-builds">Tính cho số bộ</label>
             <QtyStepper id="pv-builds" value={builds} min={1} label="Tính cho số bộ" onChange={setBuilds} />
           </div>
-          <button type="button" className="kk-btn kk-btn-outline" onClick={exportCsv} disabled={rows.length === 0}>
+          <button type="button" className="kk-btn kk-btn-outline" onClick={exportXlsx} disabled={rows.length === 0 || xlsx.busy}>
             <Download size={18} />
-            Tải BOM (CSV)
+            {xlsx.busy ? 'Đang xuất…' : 'Tải BOM (Excel)'}
           </button>
           <button type="button" className="kk-btn kk-btn-outline" onClick={() => window.print()}>
             <Printer size={18} />

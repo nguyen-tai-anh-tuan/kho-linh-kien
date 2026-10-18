@@ -11,7 +11,7 @@ import { ConfirmDialog } from '../ui/dialogs'
 import { ComponentPicker, EmptyState, Field, QtyStepper, Skeleton } from '../ui/common'
 import { friendlyError, isMissingSchema, mustChange } from '../lib/api'
 import { fetchBomLines, returnToStock } from '../lib/bom'
-import { downloadCSV } from '../lib/csv'
+import { downloadXlsx } from '../lib/xlsx'
 import { fmtNum, normalize } from '../lib/format'
 import { removeProjectFiles } from '../lib/images'
 import { ProjectGallery, useProjectImages } from './ProjectImages'
@@ -421,10 +421,21 @@ function ProjectDetail({ project, lines, images, tracked, setBom, refetchBom, on
   }
 
   function downloadMissing() {
-    const header = ['part_number', 'ten', 'can', 'ton_kho', 'thieu']
-    const body = missing.map((r) => [r.comp.part_number, r.comp.name, r.need, r.have, r.short])
-    // "can" là số còn phải xuất (đã trừ phần xuất rồi)
-    downloadCSV(`thieu-${normalize(project.name).replace(/[^a-z0-9]+/g, '-')}.csv`, [header, ...body])
+    const slug = normalize(project.name).replace(/[^a-z0-9]+/g, '-')
+    downloadXlsx({
+      filename: `thieu-${slug}.xlsx`,
+      title: `Linh kiện còn thiếu: ${project.code ? `${project.code} · ` : ''}${project.name}`,
+      subtitle: 'Số "Cần" là số còn phải xuất, đã trừ phần xuất rồi',
+      sheet: 'Còn thiếu',
+      rows: missing,
+      columns: [
+        { header: 'Mã linh kiện', value: (r) => r.comp.part_number, width: 26, wrap: true },
+        { header: 'Tên', value: (r) => r.comp.name, width: 34, wrap: true },
+        { header: 'Cần', value: (r) => r.need, type: 'int', width: 10 },
+        { header: 'Tồn kho', value: (r) => r.have, type: 'int', width: 10 },
+        { header: 'Thiếu', value: (r) => r.short, type: 'int', tone: () => 'danger', width: 10, total: true },
+      ],
+    }).catch((e) => toast.push({ tone: 'error', message: `Chưa xuất được file Excel. ${friendlyError(e)}`, duration: 9000 }))
   }
 
   return (
@@ -492,7 +503,7 @@ function ProjectDetail({ project, lines, images, tracked, setBom, refetchBom, on
             {missing.length > 0 && (
               <button type="button" className="kk-btn kk-btn-outline kk-btn-sm" onClick={downloadMissing}>
                 <Download size={16} />
-                Tải danh sách thiếu
+                Tải danh sách thiếu (Excel)
               </button>
             )}
             {canEdit && (

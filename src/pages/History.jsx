@@ -8,7 +8,7 @@ import { useShell } from '../ShellContext'
 import { useToast } from '../ui/Toast'
 import { ComponentPicker, EmptyState, Skeleton } from '../ui/common'
 import { fetchAll, friendlyError } from '../lib/api'
-import { downloadCSV } from '../lib/csv'
+import { datedName, downloadXlsx } from '../lib/xlsx'
 import { buildTree, subtreeIds } from '../lib/tree'
 import { fmtDateTime, fmtNum } from '../lib/format'
 
@@ -106,26 +106,32 @@ export default function HistoryPage() {
     )
   }
 
-  async function exportCsv() {
+  async function exportXlsx() {
     if (exporting) return
     setExporting(true)
     try {
       const all = await fetchAll(() => applyFilters(supabase.from('transactions_feed').select('*'), filters))
-      const header = ['thoi_gian', 'loai', 'part_number', 'ten', 'so_luong', 'thay_doi', 'vi_tri', 'ma_du_an', 'du_an', 'nguoi_thuc_hien', 'ghi_chu']
-      const body = all.map((t) => [
-        fmtDateTime(t.created_at),
-        TYPES[t.type]?.label ?? t.type,
-        t.part_number,
-        t.component_name,
-        t.quantity,
-        t.delta,
-        t.location_path,
-        projectCode(t.project_id),
-        t.project_name,
-        t.actor_name,
-        t.note,
-      ])
-      downloadCSV(`lich-su-kho-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...body])
+      const tone = { in: 'ok', out: 'warn' }
+      await downloadXlsx({
+        filename: datedName('lich-su-kho'),
+        title: 'Lịch sử nhập / xuất kho',
+        subtitle: hasFilter ? 'Theo bộ lọc đang chọn' : 'Toàn bộ lịch sử',
+        sheet: 'Lịch sử',
+        rows: all,
+        columns: [
+          { header: 'Thời gian', value: (t) => fmtDateTime(t.created_at), width: 17 },
+          { header: 'Loại', value: (t) => TYPES[t.type]?.label ?? t.type, tone: (t) => tone[t.type], width: 11 },
+          { header: 'Mã linh kiện', value: (t) => t.part_number, width: 26, wrap: true },
+          { header: 'Tên', value: (t) => t.component_name, width: 32, wrap: true },
+          { header: 'Số lượng', value: (t) => t.quantity, type: 'int', width: 10 },
+          { header: 'Thay đổi tồn', value: (t) => t.delta, type: 'int', width: 12 },
+          { header: 'Vị trí', value: (t) => t.location_path, width: 26, wrap: true },
+          { header: 'Mã dự án', value: (t) => projectCode(t.project_id), width: 11 },
+          { header: 'Dự án', value: (t) => t.project_name, width: 22, wrap: true },
+          { header: 'Người thực hiện', value: (t) => t.actor_name, width: 18 },
+          { header: 'Ghi chú', value: (t) => t.note, width: 30, wrap: true },
+        ],
+      })
     } catch (e) {
       toast.push({ tone: 'error', message: `Chưa xuất được file. ${friendlyError(e)}`, duration: 9000 })
     } finally {
@@ -150,9 +156,9 @@ export default function HistoryPage() {
           </p>
         </div>
         <div className="kk-quick">
-          <button type="button" className="kk-btn kk-btn-outline" onClick={exportCsv} disabled={exporting || count === 0}>
+          <button type="button" className="kk-btn kk-btn-outline" onClick={exportXlsx} disabled={exporting || count === 0}>
             {exporting ? <Loader2 size={18} className="kk-spin" /> : <Download size={18} />}
-            Xuất CSV
+            Xuất Excel
           </button>
         </div>
       </div>

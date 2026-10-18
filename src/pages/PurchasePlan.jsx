@@ -29,7 +29,9 @@ import { fmtUnitPrice, packOf, packPrice } from '../lib/price'
 import { StatCard } from '../ui/stats'
 import { CategoryChip, CategoryPicker, ComponentPicker, EmptyState, Field, QtyStepper, SelectWithCreate, Skeleton } from '../ui/common'
 import { friendlyError, isMissingSchema, mustChange } from '../lib/api'
-import { downloadCSV, parseNumber } from '../lib/csv'
+import { parseNumber } from '../lib/csv'
+import { datedName } from '../lib/xlsx'
+import { useXlsxExport } from '../ui/useXlsxExport'
 import { fmtMoneyFull, fmtNum, normalize, safeUrl } from '../lib/format'
 
 const PAGE_SIZE = 10
@@ -119,6 +121,7 @@ export default function PurchasePlan({ items }) {
   const [page, setPage] = useState(0)
   const [dialog, setDialog] = useState(null) // { kind: 'form' | 'receive' | 'delete', item }
   const [busyId, setBusyId] = useState(null)
+  const xlsx = useXlsxExport()
 
   const all = useMemo(() => (items.rows ?? []).map((it) => ({ item: it, ...describe(it, componentsById) })), [items.rows, componentsById])
   const rows = all.filter((r) => matches(r, filter))
@@ -171,27 +174,39 @@ export default function PurchasePlan({ items }) {
       await navigator.clipboard.writeText(text)
       toast.push({ message: `Đã chép ${fmtNum(rows.length)} dòng.` })
     } catch {
-      toast.push({ tone: 'error', message: 'Trình duyệt không cho chép. Bạn dùng nút Xuất CSV nhé.' })
+      toast.push({ tone: 'error', message: 'Trình duyệt không cho chép. Bạn dùng nút Xuất Excel nhé.' })
     }
   }
 
-  function exportCsv() {
-    const header = ['part_number', 'name', 'category', 'package', 'quantity', 'unit_price', 'amount', 'project', 'status', 'shop_url', 'note', 'in_stock']
-    const body = rows.map((r) => [
-      r.part,
-      r.name,
-      categoriesById.get(r.categoryId)?.path ?? '',
-      r.pkg,
-      r.item.quantity,
-      r.price ?? '',
-      r.price !== null ? r.price * r.item.quantity : '',
-      projectsById.get(r.item.project_id)?.code || projectsById.get(r.item.project_id)?.name || '',
-      STATUS[r.item.status]?.label ?? r.item.status,
-      r.item.shop_url,
-      r.item.note,
-      r.comp ? 'co' : 'moi',
-    ])
-    downloadCSV(`mua-truoc-${new Date().toISOString().slice(0, 10)}.csv`, [header, ...body])
+  function exportXlsx() {
+    const proj = (r) => projectsById.get(r.item.project_id)
+    xlsx.run({
+      filename: datedName('mua-truoc'),
+      title: 'Danh sách mua trước',
+      subtitle: filter ? FILTERS.find((f) => f.key === filter)?.label : 'Tất cả các món',
+      sheet: 'Mua trước',
+      rows,
+      columns: [
+        { header: 'Mã linh kiện', value: (r) => r.part, width: 26, wrap: true },
+        { header: 'Tên', value: (r) => r.name, width: 34, wrap: true },
+        { header: 'Danh mục', value: (r) => categoriesById.get(r.categoryId)?.path ?? '', width: 26, wrap: true },
+        { header: 'Package', value: (r) => r.pkg, width: 13 },
+        { header: 'Số lượng (cái)', value: (r) => r.item.quantity, type: 'int', width: 13, total: true },
+        { header: 'Tính theo', value: (r) => (packOf(r.comp) ? `${packOf(r.comp).unit} (${fmtNum(packOf(r.comp).qty)} cái)` : 'cái'), width: 15 },
+        { header: 'Đơn giá', value: (r) => packPrice(r.price, packOf(r.comp)), type: 'money', width: 14 },
+        { header: 'Thành tiền', value: (r) => (r.price !== null ? r.price * r.item.quantity : null), type: 'money', width: 16, total: true },
+        { header: 'Dự án', value: (r) => (proj(r) ? [proj(r).code, proj(r).name].filter(Boolean).join(' · ') : ''), width: 22, wrap: true },
+        {
+          header: 'Trạng thái',
+          value: (r) => STATUS[r.item.status]?.label ?? r.item.status,
+          tone: (r) => (r.item.status === 'ordered' ? 'ok' : 'warn'),
+          width: 14,
+        },
+        { header: 'Nơi bán', value: (r) => r.item.shop_url, type: 'link', linkText: 'Mở link', width: 12 },
+        { header: 'Ghi chú', value: (r) => r.item.note, width: 28, wrap: true },
+        { header: 'Trong kho', value: (r) => (r.comp ? `Có, đang có ${fmtNum(r.comp.total_quantity)}` : 'Linh kiện mới'), width: 18 },
+      ],
+    })
   }
 
   if (items.rows === null) {
@@ -292,9 +307,9 @@ export default function PurchasePlan({ items }) {
           <ClipboardCopy size={18} />
           Chép danh sách
         </button>
-        <button type="button" className="kk-btn kk-btn-outline" onClick={exportCsv} disabled={rows.length === 0}>
+        <button type="button" className="kk-btn kk-btn-outline" onClick={exportXlsx} disabled={rows.length === 0 || xlsx.busy}>
           <Download size={18} />
-          Xuất CSV
+          {xlsx.busy ? 'Đang xuất…' : 'Xuất Excel'}
         </button>
         {canEdit && (
           <button type="button" className="kk-btn kk-btn-primary" onClick={() => setDialog({ kind: 'form', item: null })}>
