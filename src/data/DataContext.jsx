@@ -30,8 +30,14 @@ async function loadCategories() {
 
 /** Danh sách dự án kèm số mã và tiến độ */
 async function loadProjects() {
-  // Thử lần lượt từ đầy đủ tới tối thiểu: database cũ hơn thì thiếu bớt cột (tiến độ: file 12, mã: file 10)
-  const variants = ['id,name,description,code_no,stage,stage_changed_at', 'id,name,description,code_no', 'id,name,description']
+  // Thử lần lượt từ đầy đủ tới tối thiểu: database cũ hơn thì thiếu bớt cột
+  // (trang công khai: Electronics Lab, tiến độ: file 12, mã: file 10)
+  const variants = [
+    'id,name,description,code_no,stage,stage_changed_at,slug,is_public',
+    'id,name,description,code_no,stage,stage_changed_at',
+    'id,name,description,code_no',
+    'id,name,description',
+  ]
   let last = null
   for (const columns of variants) {
     const res = await supabase.from('projects').select(columns).order('name')

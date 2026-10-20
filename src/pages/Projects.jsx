@@ -17,6 +17,8 @@ import { removeProjectFiles } from '../lib/images'
 import { ProjectGallery, useProjectImages } from './ProjectImages'
 import { STAGES, StageBar, StageTag, hasStage } from './ProjectStage'
 
+// Địa chỉ web Electronics Lab (nơi tạo dự án). Chưa đặt thì giữ nguyên cách tạo dự án cũ.
+const LAB_URL = import.meta.env.VITE_LAB_URL
 const BOM_PAGE = 10 // số dòng BOM trên một trang
 
 /**
@@ -111,10 +113,17 @@ export default function ProjectsPage() {
         </div>
         {canEdit && (
           <div className="kk-quick">
-            <button type="button" className="kk-btn kk-btn-primary" onClick={() => setDialog({ kind: 'form', project: null })}>
-              <Plus size={18} />
-              Thêm dự án
-            </button>
+            {LAB_URL ? (
+              <a className="kk-btn kk-btn-primary" href={`${LAB_URL}/quan-tri?moi=1`} target="_blank" rel="noopener noreferrer">
+                <Plus size={18} />
+                Tạo dự án ở Electronics Lab ↗
+              </a>
+            ) : (
+              <button type="button" className="kk-btn kk-btn-primary" onClick={() => setDialog({ kind: 'form', project: null })}>
+                <Plus size={18} />
+                Thêm dự án
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -149,12 +158,18 @@ export default function ProjectsPage() {
                 : 'Khi có người tạo dự án và BOM, bạn sẽ thấy ở đây.'
             }
           >
-            {canEdit && (
-              <button type="button" className="kk-btn kk-btn-primary" onClick={() => setDialog({ kind: 'form', project: null })}>
-                <Plus size={18} />
-                Thêm dự án
-              </button>
-            )}
+            {canEdit &&
+              (LAB_URL ? (
+                <a className="kk-btn kk-btn-primary" href={`${LAB_URL}/quan-tri?moi=1`} target="_blank" rel="noopener noreferrer">
+                  <Plus size={18} />
+                  Tạo dự án ở Electronics Lab ↗
+                </a>
+              ) : (
+                <button type="button" className="kk-btn kk-btn-primary" onClick={() => setDialog({ kind: 'form', project: null })}>
+                  <Plus size={18} />
+                  Thêm dự án
+                </button>
+              ))}
           </EmptyState>
         </div>
       ) : (
@@ -453,6 +468,11 @@ function ProjectDetail({ project, lines, images, tracked, setBom, refetchBom, on
             <Eye size={16} />
             Xem chi tiết
           </Link>
+          {LAB_URL && project.is_public && project.slug && (
+            <a className="kk-btn kk-btn-outline kk-btn-sm" href={`${LAB_URL}/du-an/${project.slug}`} target="_blank" rel="noopener noreferrer">
+              Xem trang công khai ↗
+            </a>
+          )}
         {canEdit && (
           <>
             <button type="button" className="kk-icon-btn kk-icon-btn-boxed kk-c-edit" aria-label="Sửa dự án" title="Sửa dự án" onClick={onEdit}>

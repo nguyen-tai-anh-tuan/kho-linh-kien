@@ -4,6 +4,7 @@ import {
   ArrowLeftRight,
   Boxes,
   Cpu,
+  ExternalLink,
   FolderKanban,
   FolderTree,
   History,
@@ -56,6 +57,9 @@ function readCollapsed() {
     return false
   }
 }
+
+// Địa chỉ web Electronics Lab: chưa đặt thì không hiện mục này
+const LAB_URL = import.meta.env.VITE_LAB_URL
 
 const MORE_PAGES = [
   { to: '/locations', label: 'Vị trí', Icon: MapPin },
@@ -251,6 +255,12 @@ function Shell({ session, profile, reloadProfile }) {
                 )}
               </NavLink>
             ))}
+            {LAB_URL && (
+              <a href={LAB_URL} target="_blank" rel="noopener noreferrer" title="Electronics Lab (mở tab mới)">
+                <ExternalLink size={20} />
+                <span className="kk-side-text">Electronics Lab ↗</span>
+              </a>
+            )}
           </nav>
 
           <div className="kk-side-foot">
@@ -380,6 +390,12 @@ function Shell({ session, profile, reloadProfile }) {
                 {to === '/buy' && buyBadges}
               </NavLink>
             ))}
+            {LAB_URL && (
+              <a href={LAB_URL} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}>
+                <ExternalLink size={20} />
+                Electronics Lab ↗
+              </a>
+            )}
             <Link to="/settings#account" onClick={() => setMenuOpen(false)}>
               <KeyRound size={20} />
               Đổi mật khẩu
