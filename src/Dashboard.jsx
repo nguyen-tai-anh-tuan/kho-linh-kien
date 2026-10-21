@@ -16,6 +16,7 @@ import {
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
+  PencilRuler,
   Plus,
   Search,
   Settings,
@@ -261,6 +262,12 @@ function Shell({ session, profile, reloadProfile }) {
                 <span className="kk-side-text">Electronics Lab ↗</span>
               </a>
             )}
+            {LAB_URL && (
+              <a href={`${LAB_URL}/quan-tri`} target="_blank" rel="noopener noreferrer" title="Quản trị Electronics Lab (mở tab mới)">
+                <PencilRuler size={20} />
+                <span className="kk-side-text">Quản trị Lab ↗</span>
+              </a>
+            )}
           </nav>
 
           <div className="kk-side-foot">
@@ -394,6 +401,12 @@ function Shell({ session, profile, reloadProfile }) {
               <a href={LAB_URL} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}>
                 <ExternalLink size={20} />
                 Electronics Lab ↗
+              </a>
+            )}
+            {LAB_URL && (
+              <a href={`${LAB_URL}/quan-tri`} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}>
+                <PencilRuler size={20} />
+                Quản trị Lab ↗
               </a>
             )}
             <Link to="/settings#account" onClick={() => setMenuOpen(false)}>
