@@ -7,6 +7,7 @@ import {
   ArrowDown,
   ChevronLeft,
   ChevronRight,
+  Cpu,
   Download,
   PackagePlus,
   Search,
@@ -19,7 +20,7 @@ import { useShell } from '../ShellContext'
 import { CategoryChip, EmptyState, Skeleton, StatusChip, StockBar } from '../ui/common'
 import { datedName, stockText, stockTone } from '../lib/xlsx'
 import { useXlsxExport } from '../ui/useXlsxExport'
-import { fmtMoneyFull, fmtNum, normalize } from '../lib/format'
+import { fmtMoneyFull, fmtNum, normalize, safeUrl } from '../lib/format'
 import { StockStatCards, stockStats } from '../ui/stats'
 import { ComponentPrice } from '../ui/PriceEdit'
 import { packOf, packPrice } from '../lib/price'
@@ -418,29 +419,34 @@ export default function ComponentsPage() {
                           />
                         </td>
                         <td data-label="Linh kiện" className="kk-cell-main">
-                          <button
-                            type="button"
-                            className="kk-row-link"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              openComponent(c.id)
-                            }}
-                          >
-                            {c.part_number}
-                          </button>
-                          {c.archived_at && <span className="kk-chip kk-chip-none kk-chip-archived">Ngừng dùng</span>}
-                          <span className="kk-cell-sub">
-                            <span className="kk-cell-name">
-                              {c.value && !normalize(c.name).includes(normalize(c.value))
-                                ? `${c.name}, ${c.value}`
-                                : c.name}
-                            </span>
-                            <CategoryChip
-                              name={c.category_name}
-                              tone={toneByCategory.get(c.category_id)}
-                              title={categoriesById.get(c.category_id)?.path}
-                            />
-                          </span>
+                          <div className="kk-cell-media">
+                            <RowThumb url={c.image_url} />
+                            <div className="kk-cell-body">
+                              <button
+                                type="button"
+                                className="kk-row-link"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openComponent(c.id)
+                                }}
+                              >
+                                {c.part_number}
+                              </button>
+                              {c.archived_at && <span className="kk-chip kk-chip-none kk-chip-archived">Ngừng dùng</span>}
+                              <span className="kk-cell-sub">
+                                <span className="kk-cell-name">
+                                  {c.value && !normalize(c.name).includes(normalize(c.value))
+                                    ? `${c.name}, ${c.value}`
+                                    : c.name}
+                                </span>
+                                <CategoryChip
+                                  name={c.category_name}
+                                  tone={toneByCategory.get(c.category_id)}
+                                  title={categoriesById.get(c.category_id)?.path}
+                                />
+                              </span>
+                            </div>
+                          </div>
                         </td>
                         <td data-label="Package" className="kk-col-pkg">
                           {c.package || '—'}
@@ -505,5 +511,29 @@ export default function ComponentsPage() {
         )}
       </div>
     </div>
+  )
+}
+
+// Ảnh nhỏ đầu dòng: ảnh lấy thẳng từ link ngoài, lỗi hay chưa có link thì hiện ô biểu tượng
+function RowThumb({ url }) {
+  const [failed, setFailed] = useState(false)
+  const src = !failed ? safeUrl(url) : null
+  if (!src) {
+    return (
+      <span className="kk-row-thumb kk-row-thumb-empty" aria-hidden="true">
+        <Cpu size={18} />
+      </span>
+    )
+  }
+  return (
+    <img
+      className="kk-row-thumb"
+      src={src}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+    />
   )
 }

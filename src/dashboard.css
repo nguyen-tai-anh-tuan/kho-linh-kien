@@ -1113,6 +1113,30 @@ button.kk-stat:focus-visible {
   color: var(--kk-link);
   text-decoration: underline;
 }
+.kk-cell-media {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.kk-cell-body {
+  min-width: 0;
+}
+.kk-row-thumb {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+}
+.kk-row-thumb-empty {
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--muted) 8%, transparent);
+  color: var(--muted);
+  opacity: 0.7;
+}
 .kk-cell-sub {
   display: flex;
   flex-wrap: wrap;
@@ -2068,6 +2092,11 @@ button.kk-stat:focus-visible {
   }
   .kk-table .kk-cell-name {
     max-width: none;
+  }
+  .kk-row-thumb {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
   }
 
   /* Cửa sổ thành bảng trượt từ đáy */
