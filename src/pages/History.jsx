@@ -6,7 +6,7 @@ import { useData } from '../data/DataContext'
 import { useTx } from '../TxContext'
 import { useShell } from '../ShellContext'
 import { useToast } from '../ui/Toast'
-import { ComponentPicker, EmptyState, Skeleton } from '../ui/common'
+import { ComponentPicker, EmptyState, RowThumb, Skeleton } from '../ui/common'
 import { fetchAll, friendlyError } from '../lib/api'
 import { datedName, downloadXlsx } from '../lib/xlsx'
 import { buildTree, subtreeIds } from '../lib/tree'
@@ -42,7 +42,7 @@ function applyFilters(query, f) {
 }
 
 export default function HistoryPage() {
-  const { locations, projects, projectCode, version } = useData()
+  const { locations, projects, projectCode, componentsById, version } = useData()
   const { openTx } = useTx()
   const { openComponent, canEdit } = useShell()
   const toast = useToast()
@@ -277,17 +277,22 @@ export default function HistoryPage() {
                           </span>
                         </td>
                         <td data-label="Linh kiện" className="kk-cell-main">
-                          <button
-                            type="button"
-                            className="kk-row-link"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              openComponent(t.component_id)
-                            }}
-                          >
-                            {t.part_number}
-                          </button>
-                          <span className="kk-cell-name">{t.component_name}</span>
+                          <div className="kk-cell-media">
+                            <RowThumb url={componentsById.get(t.component_id)?.image_url} />
+                            <div className="kk-cell-body">
+                              <button
+                                type="button"
+                                className="kk-row-link"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openComponent(t.component_id)
+                                }}
+                              >
+                                {t.part_number}
+                              </button>
+                              <span className="kk-cell-name">{t.component_name}</span>
+                            </div>
+                          </div>
                         </td>
                         <td data-label="Số lượng" className="is-num kk-strong-num">
                           <Quantity t={t} />

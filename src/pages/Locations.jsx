@@ -7,7 +7,7 @@ import { useTx } from '../TxContext'
 import { useShell } from '../ShellContext'
 import { useToast } from '../ui/Toast'
 import { ConfirmDialog, NameDialog } from '../ui/dialogs'
-import { EmptyState, Skeleton, StatusChip } from '../ui/common'
+import { EmptyState, RowThumb, Skeleton, StatusChip } from '../ui/common'
 import { mustChange } from '../lib/api'
 import { buildTree, subtreeIds } from '../lib/tree'
 import { fmtNum, normalize } from '../lib/format'
@@ -350,17 +350,22 @@ export default function LocationsPage() {
                       {pageRows.map((r) => (
                         <tr key={r.key} onClick={() => openComponent(r.comp.id)}>
                           <td data-label="Linh kiện" className="kk-cell-main">
-                            <button
-                              type="button"
-                              className="kk-row-link"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                openComponent(r.comp.id)
-                              }}
-                            >
-                              {r.comp.part_number}
-                            </button>
-                            <span className="kk-cell-name">{r.comp.name}</span>
+                            <div className="kk-cell-media">
+                              <RowThumb url={r.comp.image_url} />
+                              <div className="kk-cell-body">
+                                <button
+                                  type="button"
+                                  className="kk-row-link"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    openComponent(r.comp.id)
+                                  }}
+                                >
+                                  {r.comp.part_number}
+                                </button>
+                                <span className="kk-cell-name">{r.comp.name}</span>
+                              </div>
+                            </div>
                           </td>
                           {includeSub && selectedKids.length > 0 && <td data-label="Nằm ở">{r.inside || 'Ngay tại đây'}</td>}
                           <td data-label="Số lượng" className="is-num kk-strong-num">

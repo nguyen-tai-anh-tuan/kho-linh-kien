@@ -8,7 +8,7 @@ import { useShell } from '../ShellContext'
 import { useToast } from '../ui/Toast'
 import { Modal } from '../ui/Modal'
 import { ConfirmDialog } from '../ui/dialogs'
-import { ComponentPicker, EmptyState, Field, QtyStepper, Skeleton } from '../ui/common'
+import { ComponentPicker, EmptyState, Field, QtyStepper, RowThumb, Skeleton } from '../ui/common'
 import { friendlyError, isMissingSchema, mustChange } from '../lib/api'
 import { fetchBomLines, returnToStock } from '../lib/bom'
 import { downloadXlsx } from '../lib/xlsx'
@@ -582,10 +582,15 @@ function ProjectDetail({ project, lines, images, tracked, setBom, refetchBom, on
               {pageRows.map((r) => (
                 <tr key={r.line.id}>
                   <td data-label="Linh kiện" className="kk-cell-main">
-                    <button type="button" className="kk-row-link" onClick={() => openComponent(r.comp.id)}>
-                      {r.comp.part_number}
-                    </button>
-                    <span className="kk-cell-name">{r.comp.name}</span>
+                    <div className="kk-cell-media">
+                      <RowThumb url={r.comp.image_url} />
+                      <div className="kk-cell-body">
+                        <button type="button" className="kk-row-link" onClick={() => openComponent(r.comp.id)}>
+                          {r.comp.part_number}
+                        </button>
+                        <span className="kk-cell-name">{r.comp.name}</span>
+                      </div>
+                    </div>
                   </td>
                   <td data-label="Mỗi bộ cần">
                     {canEdit ? (

@@ -10,7 +10,7 @@ import { useBuyList } from '../data/useBuyList'
 import { useTx } from '../TxContext'
 import { useShell } from '../ShellContext'
 import { useToast } from '../ui/Toast'
-import { CategoryChip, EmptyState, Skeleton, StatusChip, StockBar } from '../ui/common'
+import { CategoryChip, EmptyState, RowThumb, Skeleton, StatusChip, StockBar } from '../ui/common'
 import { CategoryFilter } from '../ui/CategoryMenu'
 import { friendlyError, mustChange } from '../lib/api'
 import { datedName, stockText, stockTone } from '../lib/xlsx'
@@ -430,49 +430,54 @@ export default function ShoppingPage() {
                         </td>
                       )}
                       <td data-label="Linh kiện" className="kk-cell-main">
-                        <button
-                          type="button"
-                          className="kk-row-link"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            openComponent(c.id)
-                          }}
-                        >
-                          {c.part_number}
-                        </button>
-                        <span className="kk-cell-sub">
-                          <span className="kk-cell-name">{c.name}</span>
-                          <CategoryChip
-                            name={c.category_name}
-                            tone={toneByCategory.get(c.category_id)}
-                            title={categoriesById.get(c.category_id)?.path}
-                          />
-                        </span>
-                        {bom?.short > 0 && (
-                          <span className="kk-buy-why" onClick={(e) => e.stopPropagation()}>
-                            {bom.uses.slice(0, MAX_TAGS).map((u) => (
-                              <Link
-                                key={u.project.id}
-                                className="kk-prj"
-                                to={`/projects?p=${u.project.id}`}
-                                title={`${u.project.name}: mỗi bộ cần ${fmtNum(u.quantity)}. Bấm để mở dự án.`}
-                              >
-                                {u.project.code || u.project.name} ×{fmtNum(u.quantity)}
-                              </Link>
-                            ))}
-                            {bom.uses.length > MAX_TAGS && (
-                              <span
-                                className="kk-buy-more"
-                                title={bom.uses
-                                  .slice(MAX_TAGS)
-                                  .map((u) => `${u.project.code ? `${u.project.code} ` : ''}${u.project.name}: ${fmtNum(u.quantity)}`)
-                                  .join('\n')}
-                              >
-                                +{fmtNum(bom.uses.length - MAX_TAGS)} dự án khác
+                        <div className="kk-cell-media">
+                          <RowThumb url={c.image_url} />
+                          <div className="kk-cell-body">
+                            <button
+                              type="button"
+                              className="kk-row-link"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openComponent(c.id)
+                              }}
+                            >
+                              {c.part_number}
+                            </button>
+                            <span className="kk-cell-sub">
+                              <span className="kk-cell-name">{c.name}</span>
+                              <CategoryChip
+                                name={c.category_name}
+                                tone={toneByCategory.get(c.category_id)}
+                                title={categoriesById.get(c.category_id)?.path}
+                              />
+                            </span>
+                            {bom?.short > 0 && (
+                              <span className="kk-buy-why" onClick={(e) => e.stopPropagation()}>
+                                {bom.uses.slice(0, MAX_TAGS).map((u) => (
+                                  <Link
+                                    key={u.project.id}
+                                    className="kk-prj"
+                                    to={`/projects?p=${u.project.id}`}
+                                    title={`${u.project.name}: mỗi bộ cần ${fmtNum(u.quantity)}. Bấm để mở dự án.`}
+                                  >
+                                    {u.project.code || u.project.name} ×{fmtNum(u.quantity)}
+                                  </Link>
+                                ))}
+                                {bom.uses.length > MAX_TAGS && (
+                                  <span
+                                    className="kk-buy-more"
+                                    title={bom.uses
+                                      .slice(MAX_TAGS)
+                                      .map((u) => `${u.project.code ? `${u.project.code} ` : ''}${u.project.name}: ${fmtNum(u.quantity)}`)
+                                      .join('\n')}
+                                  >
+                                    +{fmtNum(bom.uses.length - MAX_TAGS)} dự án khác
+                                  </span>
+                                )}
                               </span>
                             )}
-                          </span>
-                        )}
+                          </div>
+                        </div>
                       </td>
                       <td data-label="Package" className="kk-col-pkg">
                         {c.package || '—'}

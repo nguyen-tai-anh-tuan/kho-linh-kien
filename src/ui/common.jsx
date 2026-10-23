@@ -1,9 +1,9 @@
 import { useId, useMemo, useState } from 'react'
-import { AlertTriangle, CheckCircle2, XCircle, Minus, Plus, Loader2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Cpu, XCircle, Minus, Plus, Loader2 } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { CategoryMega } from './CategoryMenu'
 import { friendlyError } from '../lib/api'
-import { fmtNum, normalize } from '../lib/format'
+import { fmtNum, normalize, safeUrl } from '../lib/format'
 
 /* ------------------------------------------------------------------ */
 /* Khung xương + vạch mạch có xung vàng chạy khi đang tải             */
@@ -492,5 +492,33 @@ export function ComponentPicker({ value, onChange, invalid, autoFocus, id }) {
         </ul>
       )}
     </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Ảnh nhỏ đầu dòng: lấy thẳng từ link ngoài, không tốn dung lượng.     */
+/* Chưa có link hoặc link hỏng thì hiện ô biểu tượng cho thẳng hàng.  */
+/* ------------------------------------------------------------------ */
+export function RowThumb({ url }) {
+  const src = safeUrl(url)
+  // Nhớ link đã hỏng chứ không chỉ cờ true/false: sửa link xong ảnh hiện lại ngay
+  const [failedSrc, setFailedSrc] = useState(null)
+  if (!src || src === failedSrc) {
+    return (
+      <span className="kk-row-thumb kk-row-thumb-empty" aria-hidden="true">
+        <Cpu size={18} />
+      </span>
+    )
+  }
+  return (
+    <img
+      className="kk-row-thumb"
+      src={src}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      onError={() => setFailedSrc(src)}
+    />
   )
 }

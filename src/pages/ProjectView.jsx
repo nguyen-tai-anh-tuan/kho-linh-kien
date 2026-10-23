@@ -17,7 +17,7 @@ import {
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
 import { useShell } from '../ShellContext'
-import { EmptyState, QtyStepper, Skeleton } from '../ui/common'
+import { EmptyState, QtyStepper, RowThumb, Skeleton } from '../ui/common'
 import { friendlyError } from '../lib/api'
 import { fetchBomLines } from '../lib/bom'
 import { useXlsxExport } from '../ui/useXlsxExport'
@@ -298,10 +298,15 @@ export default function ProjectViewPage() {
                     {g.rows.map((r) => (
                       <tr key={r.line.id}>
                         <td data-label="Linh kiện" className="kk-cell-main">
-                          <button type="button" className="kk-row-link" onClick={() => openComponent(r.comp.id)}>
-                            {r.comp.part_number}
-                          </button>
-                          <span className="kk-cell-name">{r.comp.name}</span>
+                          <div className="kk-cell-media">
+                            <RowThumb url={r.comp.image_url} />
+                            <div className="kk-cell-body">
+                              <button type="button" className="kk-row-link" onClick={() => openComponent(r.comp.id)}>
+                                {r.comp.part_number}
+                              </button>
+                              <span className="kk-cell-name">{r.comp.name}</span>
+                            </div>
+                          </div>
                         </td>
                         <td data-label="Package" className="kk-col-pkg">
                           {r.comp.package || '—'}
