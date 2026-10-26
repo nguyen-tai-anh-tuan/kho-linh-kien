@@ -21,6 +21,9 @@ import { STAGES, StageBar, StageTag, hasStage } from './ProjectStage'
 const LAB_URL = import.meta.env.VITE_LAB_URL
 const BOM_PAGE = 10 // số dòng BOM trên một trang
 
+/** Dự án hẹn giờ đăng ở Electronics Lab (ngày đăng ở tương lai) thì trang công khai chưa có */
+const notYetPublished = (project) => Boolean(project.published_at) && Date.parse(project.published_at) > Date.now()
+
 /**
  * Ghép từng dòng BOM với tồn kho.
  * total = cần cho số bộ muốn lắp, issued = đã xuất kho, need = còn phải xuất, short = kho còn thiếu.
@@ -468,7 +471,18 @@ function ProjectDetail({ project, lines, images, tracked, setBom, refetchBom, on
             <Eye size={16} />
             Xem chi tiết
           </Link>
-          {LAB_URL && project.is_public && project.slug && (
+          {LAB_URL && (
+            <a
+              className="kk-btn kk-btn-outline kk-btn-sm"
+              href={`${LAB_URL}/quan-tri/du-an/${project.id}?tab=y-tuong`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Ghi chú ý tưởng, việc cần chuẩn bị, sơ đồ tạm của dự án ở Electronics Lab"
+            >
+              Ý tưởng ↗
+            </a>
+          )}
+          {LAB_URL && project.is_public && project.slug && !notYetPublished(project) && (
             <a className="kk-btn kk-btn-outline kk-btn-sm" href={`${LAB_URL}/du-an/${project.slug}`} target="_blank" rel="noopener noreferrer">
               Xem trang công khai ↗
             </a>

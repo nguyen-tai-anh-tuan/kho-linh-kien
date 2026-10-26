@@ -33,6 +33,7 @@ async function loadProjects() {
   // Thử lần lượt từ đầy đủ tới tối thiểu: database cũ hơn thì thiếu bớt cột
   // (trang công khai: Electronics Lab, tiến độ: file 12, mã: file 10)
   const variants = [
+    'id,name,description,code_no,stage,stage_changed_at,slug,is_public,published_at',
     'id,name,description,code_no,stage,stage_changed_at,slug,is_public',
     'id,name,description,code_no,stage,stage_changed_at',
     'id,name,description,code_no',
