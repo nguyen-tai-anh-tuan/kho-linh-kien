@@ -25,14 +25,14 @@ import { useToast } from '../ui/Toast'
 import { Modal } from '../ui/Modal'
 import { ConfirmDialog } from '../ui/dialogs'
 import { InlinePrice } from '../ui/PriceEdit'
-import { fmtUnitPrice, packOf, packPrice } from '../lib/price'
+import { PRICE_UNITS, fmtUnitPrice, packOf, packPrice } from '../lib/price'
 import { StatCard } from '../ui/stats'
 import { CategoryChip, CategoryPicker, ComponentPicker, EmptyState, Field, QtyStepper, SelectWithCreate, Skeleton } from '../ui/common'
 import { friendlyError, isMissingSchema, mustChange } from '../lib/api'
 import { parseNumber } from '../lib/csv'
 import { datedName } from '../lib/xlsx'
 import { useXlsxExport } from '../ui/useXlsxExport'
-import { fmtMoneyFull, fmtNum, normalize, safeUrl } from '../lib/format'
+import { fmtMoneyFull, fmtNum, fmtPrice, normalize, safeUrl } from '../lib/format'
 
 const PAGE_SIZE = 10
 const STATUS = {
@@ -82,11 +82,35 @@ export function usePurchaseItems(version) {
   return { ...state, refresh }
 }
 
+/** Database đã chạy sql/15_purchase_price_unit.sql chưa (hỏi một lần cho cả trang) */
+let packReadyProbe = null
+function usePlanPackReady() {
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    let off = false
+    packReadyProbe ??= supabase
+      .from('purchase_items')
+      .select('price_qty')
+      .limit(1)
+      .then(({ error }) => !error)
+    packReadyProbe.then((ok) => {
+      if (!off) setReady(ok)
+      if (!ok) packReadyProbe = null // chạy SQL xong thì mở lại form là thấy
+    })
+    return () => {
+      off = true
+    }
+  }, [])
+  return ready
+}
+
 /** Ghép một món với linh kiện trong kho (nếu có) để lấy mã, tên, danh mục hiển thị */
 function describe(item, componentsById) {
   const comp = item.component_id ? componentsById.get(item.component_id) : null
   return {
     comp,
+    // Món có trong kho tính giá theo linh kiện, món mới theo cách ghi trong danh sách
+    pack: comp ? packOf(comp) : packOf(item),
     part: comp?.part_number ?? item.part_number ?? '',
     name: comp?.name ?? item.name ?? '',
     categoryId: comp?.category_id ?? item.category_id ?? null,
@@ -164,7 +188,7 @@ export default function PurchasePlan({ items }) {
       message:
         price === null
           ? `Đã xóa đơn giá dự kiến của ${r.part}.`
-          : `Đã lưu đơn giá ${fmtUnitPrice(price, packOf(r.comp))} cho ${r.part}${inStock ? ', cập nhật luôn vào kho' : ''}.`,
+          : `Đã lưu đơn giá ${fmtUnitPrice(price, r.pack)} cho ${r.part}${inStock ? ', cập nhật luôn vào kho' : ''}.`,
     })
   }
 
@@ -192,8 +216,8 @@ export default function PurchasePlan({ items }) {
         { header: 'Danh mục', value: (r) => categoriesById.get(r.categoryId)?.path ?? '', width: 26, wrap: true },
         { header: 'Package', value: (r) => r.pkg, width: 13 },
         { header: 'Số lượng (cái)', value: (r) => r.item.quantity, type: 'int', width: 13, total: true },
-        { header: 'Tính theo', value: (r) => (packOf(r.comp) ? `${packOf(r.comp).unit} (${fmtNum(packOf(r.comp).qty)} cái)` : 'cái'), width: 15 },
-        { header: 'Đơn giá', value: (r) => packPrice(r.price, packOf(r.comp)), type: 'money', width: 14 },
+        { header: 'Tính theo', value: (r) => (r.pack ? `${r.pack.unit} (${fmtNum(r.pack.qty)} cái)` : 'cái'), width: 15 },
+        { header: 'Đơn giá', value: (r) => packPrice(r.price, r.pack), type: 'money', width: 14 },
         { header: 'Thành tiền', value: (r) => (r.price !== null ? r.price * r.item.quantity : null), type: 'money', width: 16, total: true },
         { header: 'Dự án', value: (r) => (proj(r) ? [proj(r).code, proj(r).name].filter(Boolean).join(' · ') : ''), width: 22, wrap: true },
         {
@@ -395,6 +419,11 @@ export default function PurchasePlan({ items }) {
                         </td>
                         <td data-label="Số lượng" className="is-num kk-strong-num">
                           {fmtNum(r.item.quantity)}
+                          {r.pack?.qty > 1 && (
+                            <small className="kk-min-note kk-pack-note">
+                              khoảng {fmtNum(Math.ceil(r.item.quantity / r.pack.qty))} {r.pack.unit}
+                            </small>
+                          )}
                         </td>
                         <td data-label="Đơn giá" className="kk-col-price is-num">
                           <InlinePrice
@@ -403,7 +432,7 @@ export default function PurchasePlan({ items }) {
                             label={r.part}
                             option={r.comp ? { label: 'Cập nhật vào kho', defaultChecked: true } : undefined}
                             onSave={(price, toStock) => changePrice(r, price, toStock)}
-                            pack={packOf(r.comp)}
+                            pack={r.pack}
                             note={
                               r.stockPrice !== null && r.price !== null && r.price !== r.stockPrice ? (
                                 <small className="kk-price-note" title="Đơn giá dự kiến khác với đơn giá đang lưu trong kho">
@@ -557,6 +586,9 @@ export function PlanForm({ initial, preset, onSaved, onClose }) {
   const { allComponents, componentsById, projects, reload } = useData()
   const toast = useToast()
   const seed = initial ?? preset
+  const packReady = usePlanPackReady()
+  const seedComp = componentsById.get(seed?.component_id)
+  const seedPack = seedComp ? packOf(seedComp) : packOf(seed)
   const [mode, setMode] = useState(seed?.component_id ? 'stock' : 'new') // 'stock' = linh kiện đã có trong kho
   const [f, setF] = useState({
     component_id: seed?.component_id ?? null,
@@ -567,7 +599,10 @@ export function PlanForm({ initial, preset, onSaved, onClose }) {
     package: text(seed?.package),
     manufacturer: text(seed?.manufacturer),
     quantity: seed?.quantity ?? 1,
-    unit_price: text(packPrice(seed?.unit_price, packOf(componentsById.get(seed?.component_id)))),
+    unit_price: text(packPrice(seed?.unit_price, seedPack)),
+    // Chỉ dùng cho linh kiện mới: món có trong kho tính giá theo linh kiện
+    price_unit: seedComp ? '' : (seedPack?.unit ?? ''),
+    price_qty: seedComp ? '' : text(seedPack?.qty ?? ''),
     shop_url: text(seed?.shop_url),
     note: text(seed?.note),
     project_id: seed?.project_id ?? null,
@@ -582,7 +617,10 @@ export function PlanForm({ initial, preset, onSaved, onClose }) {
   const sameCode =
     mode === 'new' && f.part_number.trim() ? allComponents.find((c) => normalize(c.part_number) === normalize(f.part_number)) : null
   const stockComp = mode === 'stock' ? (f.component_id ? componentsById.get(f.component_id) : null) : sameCode
-  const pack = packOf(stockComp)
+  const ownPack = !stockComp && mode === 'new' && packReady && f.price_unit // món mới tự ghi cách tính giá
+  const typedQty = parseNumber(f.price_qty)
+  const qtyOk = Number.isInteger(typedQty) && typedQty >= 1
+  const pack = stockComp ? packOf(stockComp) : ownPack && qtyOk ? { unit: f.price_unit, qty: typedQty } : null
 
   async function submit(ev) {
     ev.preventDefault()
@@ -595,6 +633,7 @@ export function PlanForm({ initial, preset, onSaved, onClose }) {
     if (!(Number(f.quantity) >= 1)) e.quantity = 'Nhập số lượng lớn hơn 0.'
     const typed = f.unit_price.trim() === '' ? null : parseNumber(f.unit_price)
     if (typed !== null && (Number.isNaN(typed) || typed < 0)) e.unit_price = 'Nhập số tiền hợp lệ, ví dụ 3500.'
+    if (ownPack && !qtyOk) e.price_qty = `Nhập số cái trong một ${f.price_unit}, vd 840.`
     const price = typed === null || !pack ? typed : typed / pack.qty // luôn lưu giá một cái
     if (f.shop_url.trim() && !safeUrl(f.shop_url)) e.shop_url = 'Link phải bắt đầu bằng http:// hoặc https://'
     setErrors(e)
@@ -626,6 +665,7 @@ export function PlanForm({ initial, preset, onSaved, onClose }) {
       shop_url: f.shop_url.trim() || null,
       note: f.note.trim() || null,
       project_id: f.project_id,
+      ...(packReady ? { price_unit: !useStock && ownPack ? f.price_unit : null, price_qty: !useStock && ownPack ? typedQty : null } : {}),
     })
 
     // Món có trong kho: đơn giá ghi vào linh kiện, món trong danh sách đi theo đơn giá kho
@@ -733,7 +773,9 @@ export function PlanForm({ initial, preset, onSaved, onClose }) {
               ? Number(stockComp.unit_price) > 0
                 ? `Đơn giá trong kho: ${fmtUnitPrice(stockComp.unit_price, pack)}. Để trống thì dùng giá này.`
                 : 'Linh kiện này chưa có đơn giá trong kho.'
-              : undefined
+              : pack && parseNumber(f.unit_price) >= 0
+                ? `Quy ra khoảng ${fmtPrice(parseNumber(f.unit_price) / pack.qty)} một cái.`
+                : undefined
           }
         >
           <input
@@ -750,6 +792,27 @@ export function PlanForm({ initial, preset, onSaved, onClose }) {
             </label>
           )}
         </Field>
+        {mode === 'new' && !sameCode && packReady && (
+          <>
+            <Field label="Giá tính theo" htmlFor="pl-punit" hint="Món bán theo hộp, bộ, combo... thì chọn ở đây.">
+              <select id="pl-punit" value={f.price_unit} onChange={set('price_unit')}>
+                <option value="">Từng cái</option>
+                {PRICE_UNITS.map((u) => (
+                  <option key={u} value={u}>
+                    Theo {u}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            {f.price_unit ? (
+              <Field label={`Số cái trong một ${f.price_unit} *`} htmlFor="pl-pqty" error={errors.price_qty} hint="Số lượng cần mua vẫn đếm theo cái.">
+                <input id="pl-pqty" inputMode="numeric" value={f.price_qty} placeholder="Vd: 840" onChange={set('price_qty')} />
+              </Field>
+            ) : (
+              <span aria-hidden="true" />
+            )}
+          </>
+        )}
         <Field label="Link nơi bán" htmlFor="pl-url" error={errors.shop_url} className="kk-span-2">
           <input id="pl-url" type="url" value={f.shop_url} placeholder="https://…" onChange={set('shop_url')} />
         </Field>
@@ -821,6 +884,8 @@ function ReceiveDialog({ item, onDone, onClose }) {
             package: item.package,
             manufacturer: item.manufacturer,
             unit_price: item.unit_price,
+            // Món mua theo hộp / bộ (sql/15): linh kiện mới giữ luôn cách tính giá
+            ...(item.price_unit ? { price_unit: item.price_unit, price_qty: item.price_qty } : {}),
             notes: item.note,
             min_stock: levels.ready ? null : 0,
           })
