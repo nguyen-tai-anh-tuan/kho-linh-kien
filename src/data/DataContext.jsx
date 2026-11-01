@@ -14,6 +14,8 @@ export function useData() {
 
 const byName = (a, b) => a.name.localeCompare(b.name, 'vi')
 const byPath = (a, b) => a.path.localeCompare(b.path, 'vi')
+// Theo mã PRJ-01, PRJ-02... (so số nên PRJ-100 vẫn đứng sau PRJ-99); dự án chưa có mã xếp cuối, theo tên
+const byCode = (a, b) => (a.code_no ?? Infinity) - (b.code_no ?? Infinity) || byName(a, b)
 
 /** Cây danh mục kèm đường dẫn. Nếu chưa chạy sql/05_categories.sql thì dùng danh sách phẳng như trước. */
 async function loadCategories() {
@@ -148,7 +150,7 @@ export function DataProvider({ children }) {
     const toneByCategory = new Map(categories.map((c) => [c.id, rootTone.get(c.root_id) ?? 0]))
 
     // Dự án kèm mã PRJ-xx. Ở những nơi chỉ có id dự án (lịch sử giao dịch) thì tra mã qua projectCode(id).
-    const projects = raw.projects.map((p) => ({ ...p, code: projectCodeOf(p.code_no) }))
+    const projects = raw.projects.map((p) => ({ ...p, code: projectCodeOf(p.code_no) })).sort(byCode)
     const projectsById = new Map(projects.map((p) => [p.id, p]))
     const projectCode = (id) => projectsById.get(id)?.code ?? ''
 
