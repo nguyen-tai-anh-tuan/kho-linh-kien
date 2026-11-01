@@ -23,6 +23,7 @@ import { fetchBomLines } from '../lib/bom'
 import { useXlsxExport } from '../ui/useXlsxExport'
 import { packOf, packPrice } from '../lib/price'
 import { fmtDateTime, fmtMoneyFull, fmtNum, fmtPrice, normalize } from '../lib/format'
+import { ProjectCosts, useProjectCosts } from './ProjectCosts'
 import { ProjectGallery, useProjectImages } from './ProjectImages'
 import { StageBar } from './ProjectStage'
 
@@ -36,8 +37,9 @@ const TYPE_LABEL = { in: 'Trả về kho', out: 'Xuất kho', adjust: 'Điều c
 export default function ProjectViewPage() {
   const { id } = useParams()
   const { projectsById, componentsById, categoriesById, stockByComponent, loading, error, reload, version } = useData()
-  const { openComponent } = useShell()
+  const { openComponent, isAdmin } = useShell()
   const images = useProjectImages(version)
+  const costs = useProjectCosts(id, isAdmin)
   const [bom, setBom] = useState(null) // null: đang tải, { error }: lỗi, { rows, tracked }: xong
   const [history, setHistory] = useState(null)
   const [builds, setBuilds] = useState(1)
@@ -125,7 +127,16 @@ export default function ProjectViewPage() {
       title: `BOM: ${project.code ? `${project.code} · ` : ''}${project.name}`,
       subtitle: `Tính cho ${fmtNum(n)} bộ`,
       sheet: 'BOM',
-      rows: groups.flatMap((g) => [{ group: `${g.name} (${fmtNum(g.rows.length)} mã)` }, ...g.rows]),
+      rows: [
+        ...groups.flatMap((g) => [{ group: `${g.name} (${fmtNum(g.rows.length)} mã)` }, ...g.rows]),
+        // Tiền công (chỉ admin mới tải được) nằm cuối bảng, cộng luôn vào tổng Thành tiền
+        ...(costs.rows.length > 0
+          ? [
+              { group: 'Tiền công (cố định cho cả dự án)' },
+              ...costs.rows.map((c) => ({ labor: Number(c.amount), comp: { name: c.name }, price: null })),
+            ]
+          : []),
+      ],
       columns: [
         { header: 'Mã linh kiện', value: (r) => r.comp.part_number, width: 26, wrap: true },
         { header: 'Tên', value: (r) => r.comp.name, width: 32, wrap: true },
@@ -142,8 +153,8 @@ export default function ProjectViewPage() {
         { header: 'Tồn kho', value: (r) => r.have, type: 'int', width: 10 },
         { header: 'Kho thiếu', value: (r) => r.short || null, type: 'int', tone: (r) => (r.short > 0 ? 'danger' : undefined), width: 10, total: true },
         { header: 'Đơn giá', value: (r) => packPrice(r.price, packOf(r.comp)), type: 'money', width: 14 },
-        { header: 'Tính theo', value: (r) => (packOf(r.comp) ? `${packOf(r.comp).unit} (${fmtNum(packOf(r.comp).qty)} cái)` : 'cái'), width: 15 },
-        { header: 'Thành tiền', value: (r) => (r.price !== null ? r.total * r.price : null), type: 'money', width: 16, total: true },
+        { header: 'Tính theo', value: (r) => (r.labor !== undefined ? null : packOf(r.comp) ? `${packOf(r.comp).unit} (${fmtNum(packOf(r.comp).qty)} cái)` : 'cái'), width: 15 },
+        { header: 'Thành tiền', value: (r) => r.labor ?? (r.price !== null ? r.total * r.price : null), type: 'money', width: 16, total: true },
       ],
     })
   }
@@ -220,6 +231,10 @@ export default function ProjectViewPage() {
         onChanged={images.refresh}
       />
 
+      {isAdmin && !bom.error && (
+        <ProjectCosts project={project} builds={n} partsCost={totals.cost} unpriced={totals.unpriced} bomCount={rows.length} costs={costs} />
+      )}
+
       {bom.error ? (
         <div className="kk-card">
           <EmptyState title="Chưa tải được BOM" text={bom.error} />
@@ -251,7 +266,7 @@ export default function ProjectViewPage() {
             />
             <Tile
               Icon={Wallet}
-              label={`Ước tính chi phí ${fmtNum(n)} bộ`}
+              label={`Tiền linh kiện ${fmtNum(n)} bộ`}
               value={totals.unpriced === rows.length ? 'Chưa có giá' : fmtMoneyFull(totals.cost)}
               note={
                 totals.unpriced === 0

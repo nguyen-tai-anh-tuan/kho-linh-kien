@@ -3400,6 +3400,69 @@ a.kk-prj:hover {
 .kk-pv-history {
   max-height: 420px;
 }
+.kk-cost {
+  margin-bottom: 16px;
+}
+.kk-cost-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+.kk-cost-table :is(th, td) {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+.kk-cost-table thead th {
+  padding-top: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.kk-cost-table small {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+.kk-cost-table .is-num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.kk-cost-table tfoot :is(th, td) {
+  border-bottom: 0;
+  background: var(--kk-soft);
+  font-weight: 800;
+}
+.kk-cost-table .kk-cost-actions {
+  width: 84px;
+  padding-block: 4px;
+  text-align: right;
+  white-space: nowrap;
+}
+.kk-cost-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+.kk-cost-table .kk-cost-form {
+  margin-top: 0;
+}
+.kk-cost-form .kk-field {
+  flex: 1 1 220px;
+}
+.kk-cost-form .kk-cost-amount {
+  flex: 0 1 170px;
+}
+.kk-cost-error {
+  flex-basis: 100%;
+  margin: 0;
+}
 @media (max-width: 720px) {
   .kk-gallery-view {
     grid-template-columns: repeat(3, minmax(0, 1fr));
