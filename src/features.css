@@ -236,6 +236,73 @@
   max-height: 420px;
   overflow-y: auto;
 }
+/* Danh sách xếp hạng (Linh kiện dùng nhiều nhất) */
+.kk-rank {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.kk-rank-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  grid-template-areas:
+    'no name val'
+    'no bar bar';
+  align-items: center;
+  gap: 4px 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.kk-rank-row:hover,
+.kk-rank-row:focus-visible {
+  background: var(--kk-hover);
+}
+.kk-rank-no {
+  grid-area: no;
+  align-self: start;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.kk-rank-name {
+  grid-area: name;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.88rem;
+}
+.kk-rank-val {
+  grid-area: val;
+  font-size: 0.82rem;
+  color: var(--muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.kk-rank-val strong {
+  color: var(--text);
+}
+.kk-rank-track {
+  grid-area: bar;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--kk-soft);
+  overflow: hidden;
+}
+.kk-rank-track i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
 .kk-tip-total {
   margin-top: 4px;
   padding-top: 4px;

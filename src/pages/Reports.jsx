@@ -659,21 +659,31 @@ function TopUsedCard({ rows, range }) {
         ],
       }}
     >
-      <div className="kk-chart" style={{ height: Math.max(160, top.length * 30 + 20) }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={top} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }} barCategoryGap="22%">
-            <CartesianGrid horizontal={false} stroke="var(--kk-grid)" />
-            <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tick={axisTick} />
-            <YAxis type="category" dataKey="part" width={120} tickLine={false} axisLine={{ stroke: 'var(--kk-axis)' }} tick={axisTick} />
-            <Tooltip
-              content={<Tip fmt={(v) => `${fmtNum(v)} cái`} titleOf={(p) => `${p[0]?.payload?.part} · ${p[0]?.payload?.name}`} />}
-              cursor={{ fill: 'var(--kk-hover)' }}
-              isAnimationActive={false}
-            />
-            <Bar dataKey="qty" name="Đã dùng" fill={C_GOODS} radius={[0, 4, 4, 0]} isAnimationActive={false} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      {/* Danh sách xếp hạng thay cho biểu đồ cột ngang: tên linh kiện dài vẫn đọc được trên một dòng */}
+      <ol className="kk-rank">
+        {top.map((r, i) => {
+          const pct = top[0].qty > 0 ? Math.max(2, (r.qty / top[0].qty) * 100) : 0
+          return (
+            <li key={r.id}>
+              <button
+                type="button"
+                className="kk-rank-row"
+                title={`${r.part}${r.name && r.name !== r.part ? ` · ${r.name}` : ''}\nĐã dùng ${fmtNum(r.qty)} cái${r.value > 0 ? `, trị giá ${fmtMoneyFull(r.value)}` : ''}`}
+                onClick={() => openComponent(r.id)}
+              >
+                <span className="kk-rank-no">{i + 1}</span>
+                <span className="kk-rank-name">{r.part}</span>
+                <span className="kk-rank-val">
+                  <strong>{fmtNum(r.qty)}</strong> cái
+                </span>
+                <span className="kk-rank-track" aria-hidden="true">
+                  <i style={{ width: `${pct}%`, background: C_GOODS }} />
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ol>
     </ReportCard>
   )
 }
