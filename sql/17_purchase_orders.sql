@@ -3,12 +3,14 @@
 -- Chạy MỘT LẦN trong Supabase: SQL Editor -> New query -> dán -> Run.
 -- Cần chạy sau file 13, 14, 15. Chạy lại nhiều lần cũng an toàn.
 -- Chỉ THÊM bảng / cột / hàm mới. Không sửa, không xóa dữ liệu đang có
--- (riêng bước 6 điền giá mua cho mấy lần nhập kho "Mua về..." cũ để báo cáo chi tiêu có số liệu).
+-- (riêng bước 6 điền giá mua cho mấy lần nhập kho "Mua về..." cũ để báo cáo chi tiêu có số liệu,
+--  bước 7 chuyển món "Đã đặt hàng" kiểu cũ sang thẻ Đơn hàng).
 -- Nếu có lỗi ở bất kỳ bước nào thì không có gì bị thay đổi.
 --
 --   purchase_orders       : mỗi dòng là một đơn hàng (DH-01, DH-02...): nơi mua, mã đơn, ngày đặt, phí ship
 --   purchase_order_lines  : các món trong đơn: số đặt, số đã nhận, đơn giá
 --   other_expenses        : khoản chi khác (đặt mạch in, dụng cụ, thiếc hàn...)
+--   Món "Đã đặt hàng" kiểu cũ trong danh sách mua trước được gom thành một đơn (bước 7).
 --   transactions          : thêm 3 cột để biết lần nhập kho nào là MUA HÀNG và giá mua bao nhiêu
 -- =====================================================================
 
@@ -134,6 +136,88 @@ end $$;
 -- 5) Các hàm (chạy với quyền của người bấm, nên vẫn theo đúng quyền ở trên)
 -- ---------------------------------------------------------------------
 
+-- Dùng chung (schema private, web không gọi thẳng được):
+-- chuyển các món trong danh sách mua trước vào một đơn (món rời khỏi danh sách)
+create or replace function private.move_items_to_order(p_order uuid, p_items uuid[])
+returns int
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  n int;
+begin
+  insert into public.purchase_order_lines (
+    order_id, component_id, part_number, name, category_id, value, package, manufacturer,
+    price_qty, price_unit, quantity, unit_price, shop_url, note, project_id
+  )
+  select
+    p_order, i.component_id, i.part_number, i.name, i.category_id, i.value, i.package, i.manufacturer,
+    i.price_qty, i.price_unit, i.quantity,
+    -- Món trong kho chưa ghi giá riêng thì lấy đơn giá kho lúc đặt
+    coalesce(i.unit_price, nullif(c.unit_price, 0)),
+    i.shop_url, i.note, i.project_id
+  from public.purchase_items i
+  left join public.components c on c.id = i.component_id
+  where i.id = any (p_items)
+  order by i.created_at;
+
+  get diagnostics n = row_count;
+  if n = 0 then
+    raise exception 'NO_ROWS_CHANGED';
+  end if;
+
+  delete from public.purchase_items where id = any (p_items);
+  return n;
+end;
+$$;
+
+-- Dùng chung: đưa phần CHƯA NHẬN của các món trong đơn về lại danh sách mua trước ("Cần mua").
+-- p_line = null: mọi món của đơn; có p_line: chỉ món đó.
+create or replace function private.return_lines_to_list(p_order uuid, p_line uuid default null)
+returns int
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  n int;
+begin
+  insert into public.purchase_items (
+    component_id, part_number, name, category_id, value, package, manufacturer,
+    quantity, unit_price, shop_url, note, project_id, price_qty, price_unit, status
+  )
+  select
+    l.component_id,
+    case when l.component_id is null then l.part_number end,
+    case when l.component_id is null then l.name end,
+    case when l.component_id is null then l.category_id end,
+    case when l.component_id is null then l.value end,
+    case when l.component_id is null then l.package end,
+    case when l.component_id is null then l.manufacturer end,
+    l.quantity - l.received,
+    -- Món trong kho đi theo đơn giá kho, món mới giữ giá đã ghi
+    case when l.component_id is null then l.unit_price end,
+    l.shop_url, l.note, l.project_id,
+    case when l.component_id is null then l.price_qty end,
+    case when l.component_id is null then l.price_unit end,
+    'todo'
+  from public.purchase_order_lines l
+  where l.order_id = p_order
+    and (p_line is null or l.id = p_line)
+    and l.received < l.quantity
+  order by l.created_at;
+
+  get diagnostics n = row_count;
+  return n;
+end;
+$$;
+
+revoke execute on function private.move_items_to_order(uuid, uuid[]) from public, anon;
+revoke execute on function private.return_lines_to_list(uuid, uuid) from public, anon;
+grant execute on function private.move_items_to_order(uuid, uuid[]) to authenticated;
+grant execute on function private.return_lines_to_list(uuid, uuid) to authenticated;
+
 -- Tạo đơn từ các món trong danh sách mua trước. Các món được chuyển vào đơn (rời khỏi danh sách).
 create or replace function public.create_purchase_order(
   p_items      uuid[],
@@ -150,7 +234,6 @@ set search_path = ''
 as $$
 declare
   v_id uuid;
-  n    int;
 begin
   if not private.can_edit() then
     raise exception 'NOT_ALLOWED' using errcode = '42501';
@@ -169,28 +252,83 @@ begin
   )
   returning id into v_id;
 
-  insert into public.purchase_order_lines (
-    order_id, component_id, part_number, name, category_id, value, package, manufacturer,
-    price_qty, price_unit, quantity, unit_price, shop_url, note, project_id
-  )
-  select
-    v_id, i.component_id, i.part_number, i.name, i.category_id, i.value, i.package, i.manufacturer,
-    i.price_qty, i.price_unit, i.quantity,
-    -- Món trong kho chưa ghi giá riêng thì lấy đơn giá kho lúc đặt
-    coalesce(i.unit_price, nullif(c.unit_price, 0)),
-    i.shop_url, i.note, i.project_id
-  from public.purchase_items i
-  left join public.components c on c.id = i.component_id
-  where i.id = any (p_items)
-  order by i.created_at;
+  perform private.move_items_to_order(v_id, p_items);
+  return v_id;
+end;
+$$;
 
-  get diagnostics n = row_count;
-  if n = 0 then
-    raise exception 'NO_ROWS_CHANGED';
+-- Thêm món từ danh sách mua trước vào một đơn đang chờ về
+create or replace function public.add_to_purchase_order(p_order uuid, p_items uuid[])
+returns int
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  o public.purchase_orders%rowtype;
+begin
+  if not private.can_edit() then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+  if coalesce(array_length(p_items, 1), 0) = 0 then
+    raise exception 'NOTHING_SELECTED';
   end if;
 
-  delete from public.purchase_items where id = any (p_items);
-  return v_id;
+  select * into o from public.purchase_orders where id = p_order for update;
+  if not found then
+    raise exception 'NO_ROWS_CHANGED';
+  end if;
+  if o.status not in ('ordered', 'shipping', 'partial') then
+    raise exception 'ORDER_CLOSED';
+  end if;
+
+  return private.move_items_to_order(p_order, p_items);
+end;
+$$;
+
+-- Bỏ một món (chưa nhận cái nào) khỏi đơn: món về lại danh sách mua trước ("Cần mua").
+-- Đơn không còn món nào thì xóa luôn đơn. Trả về true nếu đơn bị xóa.
+create or replace function public.remove_order_line(p_line uuid)
+returns boolean
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  l public.purchase_order_lines%rowtype;
+  o public.purchase_orders%rowtype;
+begin
+  if not private.can_edit() then
+    raise exception 'NOT_ALLOWED' using errcode = '42501';
+  end if;
+
+  select * into l from public.purchase_order_lines where id = p_line for update;
+  if not found then
+    raise exception 'NO_ROWS_CHANGED';
+  end if;
+  select * into o from public.purchase_orders where id = l.order_id for update;
+  if o.status not in ('ordered', 'shipping', 'partial') then
+    raise exception 'ORDER_CLOSED';
+  end if;
+  if l.received > 0 then
+    raise exception 'LINE_RECEIVED';
+  end if;
+
+  perform private.return_lines_to_list(l.order_id, l.id);
+  delete from public.purchase_order_lines where id = l.id;
+
+  if not exists (select 1 from public.purchase_order_lines x where x.order_id = l.order_id) then
+    delete from public.purchase_orders where id = l.order_id;
+    return true;
+  end if;
+
+  -- Bỏ món còn thiếu cuối cùng của đơn đã nhận một phần: đơn coi như đã nhận xong
+  update public.purchase_orders
+  set status = 'received'
+  where id = l.order_id
+    and status = 'partial'
+    and not exists (select 1 from public.purchase_order_lines x where x.order_id = l.order_id and x.received < x.quantity);
+  return false;
 end;
 $$;
 
@@ -324,9 +462,10 @@ begin
 end;
 $$;
 
--- Đóng đơn (không chờ nữa) hoặc hủy đơn.
--- Chưa nhận món nào -> "Đã hủy". Đã nhận một phần -> "Đã nhận" (đóng lại với số đã nhận).
--- p_back_to_list = true: phần chưa nhận được đưa lại vào danh sách mua trước.
+-- Hủy đơn hoặc đóng đơn (không chờ nữa).
+-- Chưa nhận món nào -> các món về lại danh sách mua trước ("Cần mua") và đơn bị XÓA hẳn. Trả về 'deleted'.
+-- Đã nhận một phần -> đơn chuyển sang "Đã nhận" với số đã nhận. Trả về 'received'.
+--   p_back_to_list = true: phần chưa nhận về lại danh sách mua trước.
 create or replace function public.close_purchase_order(p_order uuid, p_back_to_list boolean default true)
 returns text
 language plpgsql
@@ -334,8 +473,7 @@ security invoker
 set search_path = ''
 as $$
 declare
-  o        public.purchase_orders%rowtype;
-  v_status text;
+  o public.purchase_orders%rowtype;
 begin
   if not private.can_edit() then
     raise exception 'NOT_ALLOWED' using errcode = '42501';
@@ -349,43 +487,28 @@ begin
     raise exception 'ORDER_CLOSED';
   end if;
 
-  if p_back_to_list then
-    insert into public.purchase_items (
-      component_id, part_number, name, category_id, value, package, manufacturer,
-      quantity, unit_price, shop_url, note, project_id, price_qty, price_unit
-    )
-    select
-      l.component_id,
-      case when l.component_id is null then l.part_number end,
-      case when l.component_id is null then l.name end,
-      case when l.component_id is null then l.category_id end,
-      case when l.component_id is null then l.value end,
-      case when l.component_id is null then l.package end,
-      case when l.component_id is null then l.manufacturer end,
-      l.quantity - l.received,
-      -- Món trong kho đi theo đơn giá kho, món mới giữ giá đã ghi
-      case when l.component_id is null then l.unit_price end,
-      l.shop_url, l.note, l.project_id,
-      case when l.component_id is null then l.price_qty end,
-      case when l.component_id is null then l.price_unit end
-    from public.purchase_order_lines l
-    where l.order_id = p_order and l.received < l.quantity;
+  if not exists (select 1 from public.purchase_order_lines x where x.order_id = p_order and x.received > 0) then
+    perform private.return_lines_to_list(p_order);
+    delete from public.purchase_orders where id = p_order;
+    return 'deleted';
   end if;
 
-  v_status := case
-    when exists (select 1 from public.purchase_order_lines x where x.order_id = p_order and x.received > 0) then 'received'
-    else 'cancelled'
-  end;
-
-  update public.purchase_orders set status = v_status where id = p_order;
-  return v_status;
+  if p_back_to_list then
+    perform private.return_lines_to_list(p_order);
+  end if;
+  update public.purchase_orders set status = 'received' where id = p_order;
+  return 'received';
 end;
 $$;
 
 revoke execute on function public.create_purchase_order(uuid[], text, text, date, numeric, text) from public, anon;
+revoke execute on function public.add_to_purchase_order(uuid, uuid[]) from public, anon;
+revoke execute on function public.remove_order_line(uuid) from public, anon;
 revoke execute on function public.receive_purchase_order(uuid, jsonb, boolean) from public, anon;
 revoke execute on function public.close_purchase_order(uuid, boolean) from public, anon;
 grant execute on function public.create_purchase_order(uuid[], text, text, date, numeric, text) to authenticated;
+grant execute on function public.add_to_purchase_order(uuid, uuid[]) to authenticated;
+grant execute on function public.remove_order_line(uuid) to authenticated;
 grant execute on function public.receive_purchase_order(uuid, jsonb, boolean) to authenticated;
 grant execute on function public.close_purchase_order(uuid, boolean) to authenticated;
 
@@ -402,6 +525,33 @@ where c.id = t.component_id
   and t.type = 'in'
   and t.is_purchase = false
   and t.note like 'Mua về%';
+
+-- ---------------------------------------------------------------------
+-- 7) Món đang ở trạng thái "Đã đặt hàng" kiểu cũ trong danh sách mua trước:
+--    gom thành một đơn hàng (từ giờ "Đã đặt hàng" nghĩa là nằm trong thẻ Đơn hàng).
+--    Chạy lại cũng không sao: lần sau không còn món nào ở trạng thái cũ.
+-- ---------------------------------------------------------------------
+do $$
+declare
+  v_id    uuid;
+  v_items uuid[];
+  v_day   date;
+begin
+  select array_agg(id order by created_at), min((created_at at time zone 'Asia/Ho_Chi_Minh')::date)
+  into v_items, v_day
+  from public.purchase_items
+  where status = 'ordered';
+
+  if coalesce(array_length(v_items, 1), 0) = 0 then
+    return;
+  end if;
+
+  insert into public.purchase_orders (ordered_on, note)
+  values (v_day, 'Chuyển từ trạng thái "Đã đặt hàng" của danh sách mua trước')
+  returning id into v_id;
+
+  perform private.move_items_to_order(v_id, v_items);
+end $$;
 
 notify pgrst, 'reload schema';
 

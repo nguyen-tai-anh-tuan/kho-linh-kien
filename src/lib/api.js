@@ -41,6 +41,7 @@ export function friendlyError(error) {
   if (msg.includes('NOTHING_TO_RECEIVE')) return 'Hãy nhập số lượng thực nhận cho ít nhất một món.'
   if (msg.includes('NO_LOCATION')) return 'Hãy chọn vị trí cất cho mọi món có số lượng nhận.'
   if (msg.includes('ORDER_CLOSED')) return 'Đơn hàng này đã đóng (đã nhận xong hoặc đã hủy) nên không sửa được nữa.'
+  if (msg.includes('LINE_RECEIVED')) return 'Món này đã nhận một phần nên không bỏ khỏi đơn được. Hãy dùng "Đóng đơn" nếu không chờ phần còn lại.'
   if (msg.includes('ALT_SAME')) return 'Hãy chọn một linh kiện khác với linh kiện đang xem.'
 
   if (msg.includes('INSUFFICIENT_STOCK')) {

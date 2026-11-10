@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
   ChevronLeft,
@@ -34,7 +34,7 @@ import { parseNumber } from '../lib/csv'
 import { datedName } from '../lib/xlsx'
 import { useXlsxExport } from '../ui/useXlsxExport'
 import { fmtMoneyFull, fmtNum, fmtPrice, normalize, safeUrl } from '../lib/format'
-import { shopFromUrl, useOrdersReady } from '../lib/orders'
+import { isOpenOrder, orderTotals, shopFromUrl, useOrdersReady } from '../lib/orders'
 import { CreateOrderDialog } from './Orders'
 
 const PAGE_SIZE = 10
@@ -153,6 +153,23 @@ export default function PurchasePlan({ items, orders }) {
   const ordersReady = useOrdersReady()
   const canOrder = canEdit && ordersReady
   const [selected, setSelected] = useState(() => new Set())
+  const navigate = useNavigate()
+  const openOrders = useMemo(() => (orders?.rows ?? []).filter(isOpenOrder), [orders?.rows])
+  // Có đơn hàng: "Đã đặt hàng" là các món nằm trong đơn đang chờ về (thẻ Đơn hàng)
+  const waiting = useMemo(() => {
+    let cost = 0
+    let count = 0
+    let unpriced = 0
+    for (const o of openOrders) {
+      const t = orderTotals(o)
+      cost += t.goods + t.ship
+      count += o.lines.filter((l) => l.received < l.quantity).length
+      unpriced += t.unpriced
+    }
+    return { cost, count, unpriced, orders: openOrders.length }
+  }, [openOrders])
+  const legacyOrdered = (items.rows ?? []).some((it) => it.status === 'ordered')
+  const goOrders = () => navigate('/buy?tab=orders')
   const shops = useMemo(() => [...new Set((orders?.rows ?? []).map((o) => o.shop).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi')), [orders?.rows])
 
   const all = useMemo(() => (items.rows ?? []).map((it) => ({ item: it, ...describe(it, componentsById) })), [items.rows, componentsById])
@@ -330,29 +347,49 @@ export default function PurchasePlan({ items, orders }) {
             note={`${fmtNum(sum.todo.count)} món chưa đặt${missingNote(sum.todo)}`}
             onClick={sum.todo.count > 0 && filter !== 'todo' ? () => pickFilter('todo') : undefined}
           />
-          <StatCard
-            Icon={Truck}
-            label="Đã đặt hàng"
-            value={moneyOf(sum.ordered)}
-            note={`${fmtNum(sum.ordered.count)} món đang chờ về${missingNote(sum.ordered)}`}
-            onClick={sum.ordered.count > 0 && filter !== 'ordered' ? () => pickFilter('ordered') : undefined}
-          />
+          {ordersReady ? (
+            <StatCard
+              Icon={Truck}
+              label="Đã đặt hàng"
+              value={waiting.orders > 0 ? fmtMoneyFull(waiting.cost) : '—'}
+              note={
+                waiting.orders > 0
+                  ? `${fmtNum(waiting.count)} món trong ${fmtNum(waiting.orders)} đơn đang chờ về, bấm để xem`
+                  : 'Chưa có đơn nào đang chờ về'
+              }
+              onClick={waiting.orders > 0 ? goOrders : undefined}
+            />
+          ) : (
+            <StatCard
+              Icon={Truck}
+              label="Đã đặt hàng"
+              value={moneyOf(sum.ordered)}
+              note={`${fmtNum(sum.ordered.count)} món đang chờ về${missingNote(sum.ordered)}`}
+              onClick={sum.ordered.count > 0 && filter !== 'ordered' ? () => pickFilter('ordered') : undefined}
+            />
+          )}
         </section>
       )}
 
       <div className="kk-card kk-toolbar">
         <div className="kk-pills" role="group" aria-label="Lọc theo trạng thái">
-          {FILTERS.map((f) => (
-            <button
-              key={f.key}
-              type="button"
-              className={`kk-pill ${filter === f.key ? 'is-on' : ''}`}
-              aria-pressed={filter === f.key}
-              onClick={() => pickFilter(f.key)}
-            >
-              {f.label} ({fmtNum(all.filter((r) => matches(r, f.key)).length)})
-            </button>
-          ))}
+          {FILTERS.map((f) =>
+            ordersReady && f.key === 'ordered' && !legacyOrdered ? (
+              <button key={f.key} type="button" className="kk-pill" title="Các món đã đặt nằm ở thẻ Đơn hàng" onClick={goOrders}>
+                {f.label} ({fmtNum(waiting.count)}) →
+              </button>
+            ) : (
+              <button
+                key={f.key}
+                type="button"
+                className={`kk-pill ${filter === f.key ? 'is-on' : ''}`}
+                aria-pressed={filter === f.key}
+                onClick={() => pickFilter(f.key)}
+              >
+                {f.label} ({fmtNum(all.filter((r) => matches(r, f.key)).length)})
+              </button>
+            ),
+          )}
         </div>
         <span className="kk-push-right" />
         <button type="button" className="kk-btn kk-btn-outline" onClick={copyList} disabled={rows.length === 0}>
@@ -374,7 +411,7 @@ export default function PurchasePlan({ items, orders }) {
       {canOrder && chosen.length > 0 && (
         <div className="kk-bulk" role="region" aria-label="Thao tác với mục đã chọn">
           <strong>Đã chọn {fmtNum(chosen.length)}</strong>
-          <button type="button" className="kk-btn kk-btn-primary kk-btn-sm" onClick={() => setDialog({ kind: 'order' })}>
+          <button type="button" className="kk-btn kk-btn-primary kk-btn-sm" onClick={() => setDialog({ kind: 'order', items: chosen.map((r) => r.item) })}>
             <Truck size={16} />
             Tạo đơn hàng
           </button>
@@ -537,7 +574,10 @@ export default function PurchasePlan({ items, orders }) {
                               className={`kk-plan-status is-${r.item.status}`}
                               disabled={busy}
                               title={r.item.status === 'todo' ? 'Bấm khi đã đặt hàng' : 'Bấm để đưa về "Cần mua"'}
-                              onClick={() => toggleStatus(r)}
+                              onClick={() =>
+                                // Có đơn hàng: bấm "Cần mua" là đặt hàng (tạo đơn mới hoặc thêm vào đơn đang chờ)
+                                ordersReady && r.item.status === 'todo' ? setDialog({ kind: 'order', items: [r.item] }) : toggleStatus(r)
+                              }
                             >
                               {busy ? <Loader2 size={13} className="kk-spin" /> : r.item.status === 'ordered' ? <Truck size={13} /> : null}
                               {STATUS[r.item.status]?.label ?? r.item.status}
@@ -637,8 +677,9 @@ export default function PurchasePlan({ items, orders }) {
       )}
       {dialog?.kind === 'order' && (
         <CreateOrderDialog
-          items={chosen.map((r) => r.item)}
+          items={dialog.items}
           shops={shops}
+          openOrders={openOrders}
           onDone={() => {
             setSelected(new Set())
             items.refresh()

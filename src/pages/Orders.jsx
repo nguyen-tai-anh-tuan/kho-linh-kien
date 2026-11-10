@@ -15,6 +15,7 @@ import {
   Trash2,
   Truck,
   Wallet,
+  X,
 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
@@ -35,7 +36,7 @@ import { EXPENSE_KINDS, ORDER_STATUS, isOpenOrder, orderCode, orderTotals, shopF
 const FILTERS = [
   { key: 'open', label: 'Đang chờ về' },
   { key: 'received', label: 'Đã nhận' },
-  { key: 'cancelled', label: 'Đã hủy' },
+  { key: 'cancelled', label: 'Đã hủy', onlyIfAny: true }, // hủy đơn giờ xóa hẳn đơn; chỉ còn đơn hủy kiểu cũ (nếu có)
   { key: 'all', label: 'Tất cả đơn' },
   { key: 'expenses', label: 'Khoản chi khác' },
 ]
@@ -220,7 +221,7 @@ export default function OrdersTab({ orders, expenses }) {
 
       <div className="kk-card kk-toolbar">
         <div className="kk-pills" role="group" aria-label="Lọc đơn hàng">
-          {FILTERS.map((f) => (
+          {FILTERS.filter((f) => !f.onlyIfAny || all.some((o) => matches(o, f.key))).map((f) => (
             <button
               key={f.key}
               type="button"
@@ -262,7 +263,7 @@ export default function OrdersTab({ orders, expenses }) {
           {all.length === 0 ? (
             <EmptyState
               title="Chưa có đơn hàng nào"
-              text='Vào thẻ "Danh sách mua trước", tick chọn các món định mua ở cùng một nơi rồi bấm "Tạo đơn hàng".'
+              text='Vào thẻ "Danh sách mua trước", bấm nút "Cần mua" của một món để đặt hàng, hoặc tick chọn nhiều món rồi bấm "Tạo đơn hàng".'
             >
               <Link className="kk-btn kk-btn-primary" to="/buy?tab=plan">
                 <ClipboardList size={18} />
@@ -554,13 +555,18 @@ function ExpenseForm({ initial, onSaved, onClose }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Tạo đơn hàng từ các món đã chọn trong danh sách mua trước           */
+/* Đặt hàng các món trong danh sách mua trước: tạo đơn mới, hoặc       */
+/* thêm vào một đơn đang chờ về                                        */
 /* ------------------------------------------------------------------ */
-export function CreateOrderDialog({ items, shops = [], onDone, onClose }) {
+export function CreateOrderDialog({ items, shops = [], openOrders = [], onDone, onClose }) {
   const { componentsById } = useData()
   const toast = useToast()
   // Gợi ý nơi mua: tên miền chung của link nơi bán (nếu các món cùng một trang)
   const domains = [...new Set(items.map((it) => shopFromUrl(it.shop_url)).filter(Boolean))]
+  const [mode, setMode] = useState('new') // 'new' = tạo đơn mới, 'add' = thêm vào đơn đang chờ
+  const [target, setTarget] = useState(openOrders[0]?.id ?? null)
+  const what =
+    items.length === 1 ? (componentsById.get(items[0].component_id)?.part_number ?? items[0].part_number) : `${fmtNum(items.length)} món`
   const [f, setF] = useState({
     shop: domains.length === 1 ? domains[0] : '',
     order_ref: '',
@@ -582,11 +588,24 @@ export function CreateOrderDialog({ items, shops = [], onDone, onClose }) {
   async function submit(ev) {
     ev.preventDefault()
     if (busy) return
+    setError('')
+    if (mode === 'add') {
+      if (!target) return setError('Chọn đơn muốn thêm vào.')
+      setBusy(true)
+      const { error: addErr } = await supabase.rpc('add_to_purchase_order', { p_order: target, p_items: items.map((it) => it.id) })
+      if (addErr) {
+        setBusy(false)
+        return setError(friendlyError(addErr))
+      }
+      const o = openOrders.find((x) => x.id === target)
+      onDone(target)
+      toast.push({ message: `Đã thêm ${what} vào ${orderCode(o?.code_no)}. Xem ở thẻ "Đơn hàng".` })
+      return onClose()
+    }
     const ship = parseMoney(f.shipping)
     if (ship !== null && (Number.isNaN(ship) || ship < 0)) return setShipError('Nhập số tiền hợp lệ, ví dụ 30000.')
     setShipError('')
     setBusy(true)
-    setError('')
     const { data, error: err } = await supabase.rpc('create_purchase_order', {
       p_items: items.map((it) => it.id),
       p_shop: f.shop.trim() || null,
@@ -600,14 +619,14 @@ export function CreateOrderDialog({ items, shops = [], onDone, onClose }) {
       return setError(friendlyError(err))
     }
     onDone(data)
-    toast.push({ message: `Đã tạo đơn hàng gồm ${fmtNum(items.length)} món. Xem ở thẻ "Đơn hàng".` })
+    toast.push({ message: `Đã đặt hàng ${what}. Xem ở thẻ "Đơn hàng".` })
     onClose()
   }
 
   return (
     <Modal
-      title="Tạo đơn hàng"
-      subtitle={`${fmtNum(items.length)} món đã chọn sẽ chuyển vào đơn. Hàng về thì bấm "Nhận hàng" ở thẻ Đơn hàng.`}
+      title={`Đặt hàng ${what}`}
+      subtitle={'Món đã đặt chuyển sang thẻ "Đơn hàng". Hàng về thì bấm "Nhận hàng" ở đó.'}
       size="lg"
       onClose={onClose}
       footer={
@@ -617,13 +636,42 @@ export function CreateOrderDialog({ items, shops = [], onDone, onClose }) {
           </button>
           <button type="submit" form="order-form" className="kk-btn kk-btn-primary" disabled={busy}>
             {busy ? <Loader2 size={18} className="kk-spin" /> : <Truck size={18} />}
-            Tạo đơn hàng
+            {mode === 'add' ? 'Thêm vào đơn' : 'Tạo đơn hàng'}
           </button>
         </>
       }
     >
+      {openOrders.length > 0 && (
+        <div className="kk-seg kk-seg-2" role="group" aria-label="Cách đặt hàng">
+          <button type="button" className={`kk-seg-btn ${mode === 'new' ? 'is-on' : ''}`} aria-pressed={mode === 'new'} onClick={() => setMode('new')}>
+            <Plus size={18} />
+            Tạo đơn mới
+          </button>
+          <button type="button" className={`kk-seg-btn ${mode === 'add' ? 'is-on' : ''}`} aria-pressed={mode === 'add'} onClick={() => setMode('add')}>
+            <Truck size={18} />
+            Thêm vào đơn đang chờ
+          </button>
+        </div>
+      )}
+      {mode === 'add' ? (
+        <form id="order-form" className="kk-order-pick" onSubmit={submit} noValidate>
+          {openOrders.map((o) => (
+            <label key={o.id} className={`kk-order-pick-row ${target === o.id ? 'is-on' : ''}`}>
+              <input type="radio" name="order-target" checked={target === o.id} onChange={() => setTarget(o.id)} />
+              <span>
+                <strong>
+                  {orderCode(o.code_no)} · {o.shop || 'Chưa ghi nơi mua'}
+                </strong>
+                <small>
+                  Đặt {fmtDate(o.ordered_on)} · {fmtNum(o.lines.length)} món · {ORDER_STATUS[o.status]?.label}
+                </small>
+              </span>
+            </label>
+          ))}
+        </form>
+      ) : (
       <form id="order-form" className="kk-form-grid" onSubmit={submit} noValidate>
-        <Field label="Nơi mua" htmlFor="od-shop" hint="Vd: LCSC, Shopee - Hshop, Điện tử Nhật Tảo">
+        <Field label="Nơi mua" htmlFor="od-shop" hint="Vd: LCSC, Shopee - Hshop. Để trống được, sửa sau.">
           <input id="od-shop" data-autofocus list="od-shop-list" value={f.shop} maxLength={80} onChange={set('shop')} />
           <datalist id="od-shop-list">
             {shops.map((s) => (
@@ -644,6 +692,7 @@ export function CreateOrderDialog({ items, shops = [], onDone, onClose }) {
           <textarea id="od-note" rows={2} maxLength={500} value={f.note} onChange={set('note')} />
         </Field>
       </form>
+      )}
       <ul className="kk-order-items">
         {items.map((it) => {
           const comp = componentsById.get(it.component_id)
@@ -733,6 +782,20 @@ function OrderDialog({ order, shops, onChanged, onReceive, onClose }) {
     run(status, async () => {
       mustChange(await supabase.from('purchase_orders').update({ status }).eq('id', order.id).select('id'))
       onChanged()
+    })
+
+  // Bỏ một món chưa nhận khỏi đơn: món về lại danh sách mua trước ("Cần mua"); hết món thì đơn tự mất
+  const removeLine = (line, part) =>
+    run(`del-${line.id}`, async () => {
+      const { data: gone, error: err } = await supabase.rpc('remove_order_line', { p_line: line.id })
+      if (err) throw err
+      onChanged()
+      toast.push({
+        message: gone
+          ? `Đã bỏ ${part}. ${orderCode(order.code_no)} không còn món nào nên đã được xóa; món đã về lại danh sách mua trước.`
+          : `Đã bỏ ${part} khỏi ${orderCode(order.code_no)}, món đã về lại danh sách mua trước.`,
+      })
+      if (gone) onClose()
     })
 
   return (
@@ -826,6 +889,7 @@ function OrderDialog({ order, shops, onChanged, onReceive, onClose }) {
               <th className="is-num">Đơn giá</th>
               <th className="is-num">Thành tiền</th>
               <th>Dự án</th>
+              {open && canEdit && <th aria-label="Thao tác" />}
             </tr>
           </thead>
           <tbody>
@@ -861,6 +925,22 @@ function OrderDialog({ order, shops, onChanged, onReceive, onClose }) {
                   <td className="is-num">{l.unit_price === null ? '—' : fmtUnitPrice(l.unit_price, d.pack)}</td>
                   <td className="is-num">{l.unit_price === null ? '—' : fmtMoneyFull(Number(l.unit_price) * l.quantity)}</td>
                   <td>{p ? p.code || p.name : '—'}</td>
+                  {open && canEdit && (
+                    <td>
+                      {l.received === 0 && (
+                        <button
+                          type="button"
+                          className="kk-icon-btn kk-c-del"
+                          aria-label={`Bỏ ${d.part} khỏi đơn, đưa về lại danh sách mua trước`}
+                          title="Bỏ khỏi đơn (về lại Cần mua)"
+                          disabled={Boolean(busy)}
+                          onClick={() => removeLine(l, d.part)}
+                        >
+                          {busy === `del-${l.id}` ? <Loader2 size={14} className="kk-spin" /> : <X size={14} />}
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               )
             })}
@@ -883,9 +963,10 @@ function OrderDialog({ order, shops, onChanged, onReceive, onClose }) {
         <CloseOrderDialog
           order={order}
           anyReceived={anyReceived}
-          onDone={() => {
+          onDone={(status) => {
             onChanged()
             reload()
+            if (status === 'deleted') onClose()
           }}
           onClose={() => setClosing(false)}
         />
@@ -924,11 +1005,14 @@ function CloseOrderDialog({ order, anyReceived, onDone, onClose }) {
       setBusy(false)
       return setError(friendlyError(err))
     }
-    onDone()
     toast.push({
-      message: `${orderCode(order.code_no)}: ${data === 'cancelled' ? 'đã hủy' : 'đã đóng'}${back && left > 0 ? `, ${fmtNum(left)} món chưa nhận đã về lại danh sách mua trước` : ''}.`,
+      message:
+        data === 'deleted'
+          ? `Đã hủy ${orderCode(order.code_no)}. ${fmtNum(order.lines.length)} món đã về lại danh sách mua trước ("Cần mua").`
+          : `Đã đóng ${orderCode(order.code_no)}${back && left > 0 ? `, ${fmtNum(left)} món chưa nhận đã về lại danh sách mua trước` : ''}.`,
     })
     onClose()
+    onDone(data)
   }
 
   return (
@@ -950,9 +1034,9 @@ function CloseOrderDialog({ order, anyReceived, onDone, onClose }) {
       <p className="kk-confirm-text">
         {anyReceived
           ? 'Đơn sẽ được đóng với số lượng đã nhận. Phần chưa nhận sẽ không chờ nữa.'
-          : 'Đơn sẽ chuyển sang "Đã hủy". Kho không thay đổi gì.'}
+          : 'Các món trong đơn sẽ về lại danh sách mua trước ở trạng thái "Cần mua", và đơn này bị xóa. Kho không thay đổi gì.'}
       </p>
-      {left > 0 && (
+      {anyReceived && left > 0 && (
         <label className="kk-price-sync">
           <input type="checkbox" checked={back} onChange={(e) => setBack(e.target.checked)} />
           Đưa {fmtNum(left)} món chưa nhận về lại danh sách mua trước

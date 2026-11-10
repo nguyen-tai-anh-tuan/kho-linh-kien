@@ -92,6 +92,32 @@
 .kk-order-items b {
   font-variant-numeric: tabular-nums;
 }
+.kk-order-pick {
+  display: grid;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.kk-order-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  cursor: pointer;
+}
+.kk-order-pick-row.is-on {
+  border-color: var(--kk-plan);
+  background: color-mix(in srgb, var(--kk-plan) 8%, var(--card));
+}
+.kk-order-pick-row span {
+  display: grid;
+  gap: 2px;
+}
+.kk-order-pick-row small {
+  color: var(--muted);
+}
 .kk-receive-table td {
   vertical-align: top;
 }
