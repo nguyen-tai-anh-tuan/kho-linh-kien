@@ -233,8 +233,186 @@
   gap: 8px;
 }
 .kk-report-table {
-  max-height: 420px;
-  overflow-y: auto;
+  overflow: auto;
+}
+.kk-report-card {
+  margin-bottom: 16px;
+}
+.kk-grid-charts > .kk-report-card {
+  margin-bottom: 0;
+}
+.kk-grid-charts.kk-grid-even {
+  grid-template-columns: 1fr 1fr;
+}
+/* Thanh chọn kỳ báo cáo và các thẻ */
+.kk-report-bar {
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+.kk-report-dates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.kk-report-dates label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+.kk-report-dates input {
+  width: auto;
+}
+/* Thẻ chuyển loại báo cáo: dạng tab có gạch chân */
+.kk-pills.kk-report-tabs {
+  gap: 4px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.kk-report-tabs .kk-pill {
+  margin-bottom: -1px;
+  padding: 10px 14px;
+  border: 0;
+  border-bottom: 2.5px solid transparent;
+  border-radius: 8px 8px 0 0;
+  background: none;
+  color: var(--muted);
+  font-weight: 700;
+}
+.kk-report-tabs .kk-pill:hover {
+  background: var(--kk-hover);
+  color: var(--text);
+}
+.kk-report-tabs .kk-pill.is-on {
+  border-bottom-color: var(--primary);
+  background: none;
+  color: var(--text);
+}
+.kk-report-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-bottom: 12px;
+}
+.kk-report-filters .kk-search {
+  flex: 1 1 240px;
+  max-width: 360px;
+}
+.kk-report-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+}
+/* Bảng trong báo cáo: dòng tổng, dòng bấm được, ô cắt chữ dài */
+.kk-report-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--card);
+}
+.kk-report-table tfoot td {
+  position: sticky;
+  bottom: 0;
+  background: var(--kk-soft);
+  font-weight: 700;
+  border-bottom: 0;
+}
+.kk-rows-click tbody tr {
+  cursor: pointer;
+}
+.kk-rows-click tbody tr:hover,
+.kk-rows-click tbody tr:focus-visible {
+  background: var(--kk-hover);
+  outline: none;
+}
+.kk-report-table td,
+.kk-report-table th {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.kk-report-table .kk-cell-clip {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kk-report-table .kk-cell-wrap {
+  min-width: 200px;
+  white-space: normal;
+}
+.kk-mini-table .kk-up {
+  color: var(--ok);
+  font-weight: 600;
+}
+.kk-mini-table .kk-down {
+  color: var(--kk-out);
+  font-weight: 600;
+}
+/* Dải số liệu nhỏ ở đầu cửa sổ chi tiết */
+.kk-card-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 24px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--kk-soft);
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.kk-card-strip strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.kk-kind,
+.kk-spend-kind {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  background: var(--kk-soft);
+  color: var(--muted);
+}
+.kk-kind-up {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.kk-kind-down {
+  background: color-mix(in srgb, var(--kk-out) 14%, var(--card));
+  color: var(--kk-out);
+}
+.kk-spend-kind.is-goods {
+  background: color-mix(in srgb, var(--series-1) 14%, var(--card));
+  color: var(--text);
+}
+.kk-spend-kind.is-ship {
+  background: color-mix(in srgb, var(--series-2) 16%, var(--card));
+  color: var(--text);
+}
+.kk-spend-kind.is-other {
+  background: color-mix(in srgb, var(--series-3) 16%, var(--card));
+  color: var(--text);
+}
+.kk-price-change {
+  margin-left: 6px;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.kk-price-change.is-up {
+  color: var(--kk-out);
+}
+.kk-price-change.is-down {
+  color: var(--ok);
+}
+.kk-tip-hint {
+  margin-top: 4px;
+  font-size: 0.74rem;
+  color: var(--muted);
 }
 /* Danh sách xếp hạng (Linh kiện dùng nhiều nhất) */
 .kk-rank {
@@ -293,6 +471,8 @@
 }
 .kk-rank-track {
   grid-area: bar;
+  display: flex;
+  gap: 2px;
   height: 8px;
   border-radius: 999px;
   background: var(--kk-soft);
@@ -300,8 +480,11 @@
 }
 .kk-rank-track i {
   display: block;
+  flex: none;
   height: 100%;
-  border-radius: 999px;
+}
+.kk-rank-track i:last-child {
+  border-radius: 0 999px 999px 0;
 }
 .kk-tip-total {
   margin-top: 4px;
@@ -313,13 +496,34 @@
   .kk-txline-grid.has-price {
     grid-template-columns: 1fr;
   }
-  .kk-report-range {
+  .kk-report-bar .kk-toggle {
     width: 100%;
   }
-  .kk-report-range button {
+  .kk-report-bar .kk-toggle button {
     flex: 1;
+  }
+  .kk-pills.kk-report-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .kk-report-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .kk-report-tabs .kk-pill {
+    flex: none;
+  }
+  .kk-report-table .kk-cell-clip {
+    max-width: 160px;
   }
   .kk-receive-price {
     width: 100%;
+  }
+}
+
+@media (max-width: 1180px) {
+  .kk-grid-charts.kk-grid-even {
+    grid-template-columns: 1fr;
   }
 }
