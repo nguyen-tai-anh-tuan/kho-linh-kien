@@ -77,8 +77,15 @@ export function StatusPill({ status }) {
 /* ------------------------------------------------------------------ */
 /* Thẻ "Đơn hàng" của trang Cần mua                                    */
 /* ------------------------------------------------------------------ */
-export default function OrdersTab({ orders, expenses }) {
-  const { componentsById, projectsById } = useData()
+export default function OrdersTab({ orders, expenses, planItems }) {
+  const { componentsById, projectsById, reload } = useData()
+  // Hủy đơn / bỏ món khỏi đơn đưa món về lại danh sách mua trước: tải lại cả hai danh sách
+  // (và dữ liệu chung, để nhãn "Trong đơn DH-xx" và số trên thanh bên cũng cập nhật ngay)
+  const refreshAll = () => {
+    orders.refresh()
+    planItems?.refresh()
+    reload()
+  }
   const { canEdit, isAdmin } = useShell()
   const [filter, setFilter] = useState('open')
   const [dialog, setDialog] = useState(null) // { kind: 'order' | 'receive' | 'expense' | 'delete-expense', ... }
@@ -352,7 +359,7 @@ export default function OrdersTab({ orders, expenses }) {
         <OrderDialog
           order={all.find((o) => o.id === dialog.id)}
           shops={shops}
-          onChanged={orders.refresh}
+          onChanged={refreshAll}
           onReceive={() => setDialog({ kind: 'receive', id: dialog.id })}
           onClose={() => setDialog(null)}
         />
@@ -719,7 +726,7 @@ export function CreateOrderDialog({ items, shops = [], openOrders = [], onDone, 
 /* Chi tiết một đơn: sửa thông tin, đổi trạng thái, hủy / đóng đơn      */
 /* ------------------------------------------------------------------ */
 function OrderDialog({ order, shops, onChanged, onReceive, onClose }) {
-  const { componentsById, projectsById, reload } = useData()
+  const { componentsById, projectsById } = useData()
   const { canEdit, openComponent } = useShell()
   const toast = useToast()
   const open = isOpenOrder(order)
@@ -965,7 +972,6 @@ function OrderDialog({ order, shops, onChanged, onReceive, onClose }) {
           anyReceived={anyReceived}
           onDone={(status) => {
             onChanged()
-            reload()
             if (status === 'deleted') onClose()
           }}
           onClose={() => setClosing(false)}

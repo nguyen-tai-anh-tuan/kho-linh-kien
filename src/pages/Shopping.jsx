@@ -285,7 +285,7 @@ export default function ShoppingPage() {
           </div>
         </div>
         {tabs}
-        <OrdersTab orders={orders} expenses={expenses} />
+        <OrdersTab orders={orders} expenses={expenses} planItems={planItems} />
       </div>
     )
   }
