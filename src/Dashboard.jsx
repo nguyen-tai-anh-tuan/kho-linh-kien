@@ -3,6 +3,7 @@ import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useSe
 import {
   ArrowLeftRight,
   Boxes,
+  ChartColumn,
   Cpu,
   ExternalLink,
   FolderKanban,
@@ -41,6 +42,7 @@ import CategoriesPage from './pages/Categories'
 import ProjectsPage from './pages/Projects'
 import ProjectViewPage from './pages/ProjectView'
 import HistoryPage from './pages/History'
+import ReportsPage from './pages/Reports'
 import SettingsPage from './pages/Settings'
 import { Modal } from './ui/Modal'
 import ComponentDrawer from './ComponentDrawer'
@@ -48,6 +50,7 @@ import ComponentForm from './ComponentForm'
 import ImportCsvModal from './ImportCsvModal'
 import './auth.css'
 import './dashboard.css'
+import './features.css'
 
 const COLLAPSE_KEY = 'kho_sidebar_collapsed'
 
@@ -67,6 +70,7 @@ const MORE_PAGES = [
   { to: '/categories', label: 'Danh mục', Icon: FolderTree },
   { to: '/projects', label: 'Dự án và BOM', Icon: FolderKanban },
   { to: '/history', label: 'Lịch sử', Icon: History },
+  { to: '/reports', label: 'Báo cáo', Icon: ChartColumn },
   { to: '/settings', label: 'Cài đặt', Icon: Settings },
 ]
 // Trên điện thoại thanh tab chỉ đủ chỗ cho một trang nữa, các trang còn lại nằm trong mục "Khác"
@@ -355,6 +359,7 @@ function Shell({ session, profile, reloadProfile }) {
               <Route path="/projects" element={<ProjectsPage />} />
               <Route path="/projects/:id" element={<ProjectViewPage />} />
               <Route path="/history" element={<HistoryPage />} />
+              <Route path="/reports" element={<ReportsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

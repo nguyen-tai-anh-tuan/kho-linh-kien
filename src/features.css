@@ -1,0 +1,232 @@
+/* =====================================================================
+   Đơn hàng, linh kiện tương đương, báo cáo (thêm tháng 11/2026)
+   Chỉ thêm class mới, không ghi đè kiểu cũ của web.
+   ===================================================================== */
+
+.kk-size-xl {
+  max-width: 1040px;
+}
+.kk-note-sm {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+/* Trang Cần mua có ba thẻ */
+.kk-buy-tabs.kk-buy-tabs-3 {
+  max-width: 760px;
+}
+
+/* ---- Đơn hàng ---- */
+.kk-order-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.kk-order-status.is-plan {
+  background: color-mix(in srgb, var(--kk-plan) 16%, var(--card));
+  color: var(--kk-plan);
+}
+.kk-order-status.is-warn {
+  background: var(--kk-warn-bg);
+  color: var(--kk-warn);
+  box-shadow: inset 0 0 0 1px var(--kk-warn-line);
+}
+.kk-order-status.is-ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.kk-order-status.is-muted {
+  background: var(--kk-soft);
+  color: var(--muted);
+}
+.kk-orders-table tbody tr {
+  cursor: pointer;
+}
+.kk-order-steps {
+  align-items: center;
+  margin-bottom: 14px;
+}
+.kk-order-lines {
+  margin-top: 16px;
+}
+.kk-order-sum {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 20px;
+  margin: 12px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.kk-order-items {
+  display: grid;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 16px 0 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--kk-soft);
+  list-style: none;
+}
+.kk-order-items li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+.kk-order-items span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.kk-order-items b {
+  font-variant-numeric: tabular-nums;
+}
+.kk-receive-table td {
+  vertical-align: top;
+}
+.kk-receive-table .kk-stepper {
+  min-width: 130px;
+}
+.kk-receive-price {
+  width: 120px;
+}
+.kk-receive-table select {
+  min-width: 150px;
+}
+
+/* Cửa sổ nhập kho: ô giá mua thêm một cột */
+.kk-txline-grid.has-price {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 150px 120px 38px;
+}
+.kk-tx-purchase {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 20px;
+  margin-top: 14px;
+}
+
+/* ---- Linh kiện tương đương ---- */
+.kk-alt-self {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+.kk-alt-list {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+.kk-alt-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.kk-alt-list .kk-list-main {
+  flex: 1;
+  min-width: 0;
+}
+.kk-alt-ico {
+  flex: none;
+  color: var(--kk-plan);
+}
+.kk-alt-note-edit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+.kk-alt-note-edit input {
+  flex: 1;
+  min-width: 0;
+}
+.kk-alt-add {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--kk-soft);
+}
+.kk-alt-add-actions {
+  display: flex;
+  gap: 8px;
+}
+.kk-alt-open {
+  margin-bottom: 8px;
+}
+.kk-alt-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--kk-plan);
+}
+.kk-alt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--kk-plan) 12%, var(--card));
+  color: var(--kk-plan);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: help;
+}
+
+/* ---- Báo cáo ---- */
+.kk-report-wide {
+  margin-bottom: 16px;
+}
+.kk-report-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kk-report-table {
+  max-height: 420px;
+  overflow-y: auto;
+}
+.kk-tip-total {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 720px) {
+  .kk-txline-grid.has-price {
+    grid-template-columns: 1fr;
+  }
+  .kk-report-range {
+    width: 100%;
+  }
+  .kk-report-range button {
+    flex: 1;
+  }
+  .kk-receive-price {
+    width: 100%;
+  }
+}

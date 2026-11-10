@@ -17,6 +17,7 @@ import {
   ShoppingCart,
   Trash2,
   Truck,
+  X,
 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
@@ -33,6 +34,8 @@ import { parseNumber } from '../lib/csv'
 import { datedName } from '../lib/xlsx'
 import { useXlsxExport } from '../ui/useXlsxExport'
 import { fmtMoneyFull, fmtNum, fmtPrice, normalize, safeUrl } from '../lib/format'
+import { shopFromUrl, useOrdersReady } from '../lib/orders'
+import { CreateOrderDialog } from './Orders'
 
 const PAGE_SIZE = 10
 const STATUS = {
@@ -137,7 +140,7 @@ async function savePrice(item, price, toStock) {
 }
 
 /** Thẻ "Danh sách mua trước" của trang Cần mua */
-export default function PurchasePlan({ items }) {
+export default function PurchasePlan({ items, orders }) {
   const { componentsById, categoriesById, toneByCategory, projectsById, reload } = useData()
   const { openComponent, canEdit, isAdmin } = useShell()
   const toast = useToast()
@@ -146,6 +149,11 @@ export default function PurchasePlan({ items }) {
   const [dialog, setDialog] = useState(null) // { kind: 'form' | 'receive' | 'delete', item }
   const [busyId, setBusyId] = useState(null)
   const xlsx = useXlsxExport()
+  // Chọn nhiều món để gom thành một đơn hàng (cần sql/17_purchase_orders.sql)
+  const ordersReady = useOrdersReady()
+  const canOrder = canEdit && ordersReady
+  const [selected, setSelected] = useState(() => new Set())
+  const shops = useMemo(() => [...new Set((orders?.rows ?? []).map((o) => o.shop).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi')), [orders?.rows])
 
   const all = useMemo(() => (items.rows ?? []).map((it) => ({ item: it, ...describe(it, componentsById) })), [items.rows, componentsById])
   const rows = all.filter((r) => matches(r, filter))
@@ -166,6 +174,26 @@ export default function PurchasePlan({ items }) {
   const pageRows = rows.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)
   const priced = rows.filter((r) => r.price !== null)
   const cost = priced.reduce((sum, r) => sum + r.price * r.item.quantity, 0)
+
+  const chosen = all.filter((r) => selected.has(r.item.id))
+  const allOnPage = pageRows.length > 0 && pageRows.every((r) => selected.has(r.item.id))
+  const someOnPage = pageRows.some((r) => selected.has(r.item.id))
+  function toggleAll() {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (allOnPage) pageRows.forEach((r) => next.delete(r.item.id))
+      else pageRows.forEach((r) => next.add(r.item.id))
+      return next
+    })
+  }
+  function toggleOne(id) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   async function toggleStatus(r) {
     setBusyId(r.item.id)
@@ -343,6 +371,21 @@ export default function PurchasePlan({ items }) {
         )}
       </div>
 
+      {canOrder && chosen.length > 0 && (
+        <div className="kk-bulk" role="region" aria-label="Thao tác với mục đã chọn">
+          <strong>Đã chọn {fmtNum(chosen.length)}</strong>
+          <button type="button" className="kk-btn kk-btn-primary kk-btn-sm" onClick={() => setDialog({ kind: 'order' })}>
+            <Truck size={16} />
+            Tạo đơn hàng
+          </button>
+          <button type="button" className="kk-btn kk-btn-ghost kk-btn-sm" onClick={() => setSelected(new Set())}>
+            <X size={16} />
+            Bỏ chọn
+          </button>
+          <span className="kk-muted-text">Gom các món mua cùng một nơi thành một đơn, hàng về thì nhận một lần cho cả đơn.</span>
+        </div>
+      )}
+
       <div className="kk-card kk-table-card">
         {all.length === 0 ? (
           <EmptyState
@@ -371,6 +414,19 @@ export default function PurchasePlan({ items }) {
               <table className="kk-table kk-table-plain kk-table-static kk-buy-table">
                 <thead>
                   <tr>
+                    {canOrder && (
+                      <th className="kk-col-check">
+                        <input
+                          type="checkbox"
+                          aria-label="Chọn tất cả món trên trang này"
+                          checked={allOnPage}
+                          ref={(el) => {
+                            if (el) el.indeterminate = !allOnPage && someOnPage
+                          }}
+                          onChange={toggleAll}
+                        />
+                      </th>
+                    )}
                     <th>Linh kiện</th>
                     <th className="kk-col-pkg">Package</th>
                     <th className="is-num">Số lượng</th>
@@ -388,7 +444,17 @@ export default function PurchasePlan({ items }) {
                     const url = safeUrl(r.item.shop_url)
                     const busy = busyId === r.item.id
                     return (
-                      <tr key={r.item.id}>
+                      <tr key={r.item.id} className={selected.has(r.item.id) ? 'is-selected' : ''}>
+                        {canOrder && (
+                          <td className="kk-col-check">
+                            <input
+                              type="checkbox"
+                              aria-label={`Chọn ${r.part}`}
+                              checked={selected.has(r.item.id)}
+                              onChange={() => toggleOne(r.item.id)}
+                            />
+                          </td>
+                        )}
                         <td data-label="Linh kiện" className="kk-cell-main">
                           {r.comp ? (
                             <button type="button" className="kk-row-link" onClick={() => openComponent(r.comp.id)}>
@@ -557,7 +623,30 @@ export default function PurchasePlan({ items }) {
       </div>
 
       {dialog?.kind === 'form' && <PlanForm initial={dialog.item} onSaved={items.refresh} onClose={() => setDialog(null)} />}
-      {dialog?.kind === 'receive' && <ReceiveDialog item={dialog.item} onDone={items.refresh} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'receive' && (
+        <ReceiveDialog
+          item={dialog.item}
+          ordersReady={ordersReady}
+          shops={shops}
+          onDone={() => {
+            items.refresh()
+            orders?.refresh()
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'order' && (
+        <CreateOrderDialog
+          items={chosen.map((r) => r.item)}
+          shops={shops}
+          onDone={() => {
+            setSelected(new Set())
+            items.refresh()
+            orders?.refresh()
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
       {dialog?.kind === 'delete' && (
         <ConfirmDialog
           title={`Xóa ${dialog.part} khỏi danh sách mua trước?`}
@@ -847,7 +936,7 @@ export function PlanForm({ initial, preset, onSaved, onClose }) {
 /* ------------------------------------------------------------------ */
 /* Đã mua: tạo linh kiện (nếu là món mới), nhập kho, gắn vào BOM        */
 /* ------------------------------------------------------------------ */
-function ReceiveDialog({ item, onDone, onClose }) {
+function ReceiveDialog({ item, ordersReady, shops = [], onDone, onClose }) {
   const { allComponents, componentsById, locations, projectsById, levels, createLocation, reload } = useData()
   const { openComponent } = useShell()
   const toast = useToast()
@@ -862,11 +951,73 @@ function ReceiveDialog({ item, onDone, onClose }) {
   const [error, setError] = useState('')
   const part = existing?.part_number ?? item.part_number
   const name = existing?.name ?? item.name
+  // Có sql/17: ghi thêm giá mua thực tế, nơi mua, phí ship (tính vào báo cáo chi tiêu)
+  const pack = existing ? packOf(existing) : packOf(item)
+  const listedPrice = item.unit_price ?? (Number(existing?.unit_price) > 0 ? existing.unit_price : null)
+  const [price, setPrice] = useState(() => (listedPrice === null ? '' : String(packPrice(listedPrice, pack))))
+  const [shop, setShop] = useState(() => shopFromUrl(item.shop_url))
+  const [ship, setShip] = useState('')
+  const [toStock, setToStock] = useState(true)
+
+  /** Đã mua theo kiểu mới: tạo một đơn 1 món rồi nhận hàng ngay, để có lịch sử và chi tiêu */
+  async function runAsOrder() {
+    const typed = price.trim() === '' ? null : parseNumber(price)
+    if (typed !== null && (Number.isNaN(typed) || typed < 0)) return setError('Đơn giá không hợp lệ. Nhập số, ví dụ 3500, hoặc để trống.')
+    const shipFee = ship.trim() === '' ? 0 : parseNumber(ship)
+    if (Number.isNaN(shipFee) || shipFee < 0) return setError('Phí ship không hợp lệ, ví dụ 30000.')
+    const unitPrice = typed === null ? null : pack ? typed / pack.qty : typed
+    setBusy(true)
+    setError('')
+    const created = await supabase.rpc('create_purchase_order', {
+      p_items: [item.id],
+      p_shop: shop.trim() || null,
+      p_ref: null,
+      p_ordered_on: null,
+      p_shipping: shipFee,
+      p_note: null,
+    })
+    if (created.error) {
+      setBusy(false)
+      return setError(friendlyError(created.error))
+    }
+    const orderId = created.data
+    try {
+      const { data: lines, error: lineErr } = await supabase.from('purchase_order_lines').select('id').eq('order_id', orderId)
+      if (lineErr) throw lineErr
+      const { error: recvErr } = await supabase.rpc('receive_purchase_order', {
+        p_order: orderId,
+        p_update_price: Boolean(existing) && toStock,
+        p_lines: [{ line_id: lines[0]?.id, qty: Number(qty), location_id: loc, unit_price: unitPrice }],
+      })
+      if (recvErr) throw recvErr
+      // Mua lẻ: nhận ít hơn số đã lên danh sách thì cũng coi như xong, không chờ phần còn lại
+      if (Number(qty) < item.quantity) await supabase.rpc('close_purchase_order', { p_order: orderId, p_back_to_list: false })
+    } catch (e) {
+      await reload()
+      onDone()
+      toast.push({
+        tone: 'error',
+        duration: 12000,
+        message: `Đã chuyển ${part} vào một đơn hàng mới nhưng chưa nhập kho được: ${friendlyError(e)} Mở thẻ "Đơn hàng" để bấm Nhận hàng lại.`,
+      })
+      return onClose()
+    }
+    await reload()
+    onDone()
+    const comp = (await supabase.from('purchase_order_lines').select('component_id').eq('order_id', orderId).maybeSingle()).data?.component_id
+    toast.push({
+      duration: 9000,
+      message: `Đã nhập kho ${fmtNum(qty)} × ${part}${existing ? '' : ' (linh kiện mới)'}${project ? `, mua cho ${project.code || project.name}` : ''}. Lần mua này đã được ghi ở thẻ "Đơn hàng".`,
+      action: comp ? { label: 'Xem linh kiện', onClick: () => openComponent(comp) } : undefined,
+    })
+    onClose()
+  }
 
   async function run() {
     if (busy) return
     if (!(Number(qty) >= 1)) return setError('Nhập số lượng thực nhận lớn hơn 0.')
     if (!loc) return setError('Chọn vị trí cất linh kiện.')
+    if (ordersReady) return runAsOrder()
     setBusy(true)
     setError('')
     let componentId = existing?.id ?? null
@@ -981,6 +1132,30 @@ function ReceiveDialog({ item, onDone, onClose }) {
             createLabel="Thêm vị trí mới"
           />
         </Field>
+        {ordersReady && (
+          <>
+            <Field label={pack ? `Giá mua thực tế / ${pack.unit} (đ)` : 'Giá mua thực tế / cái (đ)'} htmlFor="rc-price" hint="Để tính chi tiêu. Để trống nếu chưa biết.">
+              <input id="rc-price" inputMode="decimal" value={price} placeholder="Chưa có giá" onChange={(e) => setPrice(e.target.value)} />
+              {existing && (
+                <label className="kk-price-sync">
+                  <input type="checkbox" checked={toStock} onChange={(e) => setToStock(e.target.checked)} />
+                  Cập nhật giá này vào kho
+                </label>
+              )}
+            </Field>
+            <Field label="Phí ship (đ)" htmlFor="rc-ship" hint="Không bắt buộc.">
+              <input id="rc-ship" inputMode="decimal" value={ship} placeholder="0" onChange={(e) => setShip(e.target.value)} />
+            </Field>
+            <Field label="Nơi mua" htmlFor="rc-shop" className="kk-span-2">
+              <input id="rc-shop" list="rc-shop-list" value={shop} maxLength={80} placeholder="Vd: LCSC, Shopee - Hshop" onChange={(e) => setShop(e.target.value)} />
+              <datalist id="rc-shop-list">
+                {shops.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+            </Field>
+          </>
+        )}
       </div>
       {error && (
         <p className="kk-form-error" role="alert">

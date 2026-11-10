@@ -36,6 +36,12 @@ export function friendlyError(error) {
   if (msg.includes('CATEGORY_HAS_CHILDREN')) return 'Danh mục này còn danh mục bên trong. Hãy xóa hoặc chuyển chúng đi trước.'
   if (msg.includes('LAST_ADMIN')) return 'Kho phải còn ít nhất một admin. Hãy cho người khác làm admin trước.'
   if (msg.includes('NOT_ADMIN')) return 'Chỉ admin mới làm được việc này.'
+  if (msg.includes('NOT_ALLOWED')) return 'Vai trò của bạn không được phép làm việc này. Nếu cần, hãy nhờ admin cấp thêm quyền.'
+  if (msg.includes('NOTHING_SELECTED')) return 'Hãy chọn ít nhất một món.'
+  if (msg.includes('NOTHING_TO_RECEIVE')) return 'Hãy nhập số lượng thực nhận cho ít nhất một món.'
+  if (msg.includes('NO_LOCATION')) return 'Hãy chọn vị trí cất cho mọi món có số lượng nhận.'
+  if (msg.includes('ORDER_CLOSED')) return 'Đơn hàng này đã đóng (đã nhận xong hoặc đã hủy) nên không sửa được nữa.'
+  if (msg.includes('ALT_SAME')) return 'Hãy chọn một linh kiện khác với linh kiện đang xem.'
 
   if (msg.includes('INSUFFICIENT_STOCK')) {
     const detail = error?.details ? ` (${error.details})` : ''
@@ -61,7 +67,11 @@ export function friendlyError(error) {
     low.includes('could not find the') ||
     low.includes('does not exist')
   ) {
-    const file = low.includes('project_bom')
+    const file = /purchase_order|other_expenses|is_purchase|unit_cost/.test(low)
+      ? 'sql/17_purchase_orders.sql'
+      : /alternate/.test(low)
+        ? 'sql/18_alternates.sql'
+        : low.includes('project_bom')
       ? 'sql/03_pages.sql'
       : /archived_at|delete_component/.test(low)
         ? 'sql/06_archive.sql'

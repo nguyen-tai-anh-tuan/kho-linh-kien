@@ -7,6 +7,9 @@ import { Modal } from './ui/Modal'
 import { ComponentPicker, Field, QtyStepper, SelectWithCreate } from './ui/common'
 import { friendlyError } from './lib/api'
 import { fmtNum } from './lib/format'
+import { parseNumber } from './lib/csv'
+import { packOf, packPrice } from './lib/price'
+import { useOrdersReady } from './lib/orders'
 
 const TxContext = createContext(null)
 
@@ -28,6 +31,8 @@ export function useUndoTx() {
         type: r.type === 'in' ? 'out' : r.type === 'out' ? 'in' : 'adjust',
         quantity: r.type === 'adjust' ? r.quantity - r.delta : r.quantity,
         note: 'Hoàn tác giao dịch trước',
+        // Hoàn tác một lần mua hàng: giao dịch ngược lại cũng đánh dấu là mua để báo cáo trừ chi tiêu (sql/17)
+        ...(r.is_purchase ? { is_purchase: true, unit_cost: r.unit_cost ?? null } : {}),
       }))
       const { error: err } = await supabase.from('transactions').insert(inverse)
       if (err) {
@@ -62,7 +67,10 @@ const TYPES = {
 }
 
 let lineSeq = 0
-const newLine = (componentId = null) => ({ id: ++lineSeq, componentId, locationId: null, qty: '' })
+const newLine = (componentId = null) => ({ id: ++lineSeq, componentId, locationId: null, qty: '', price: '' })
+
+/** Giá mua gợi ý cho một dòng: đơn giá kho (theo hộp / bộ nếu linh kiện tính giá như vậy) */
+const suggestPrice = (comp) => (Number(comp?.unit_price) > 0 ? String(packPrice(comp.unit_price, packOf(comp))) : '')
 
 function TxModal({ type: initialType = 'in', componentId, componentIds, locationId: presetLocationId, onClose }) {
   const { componentsById, locations, projects, stockMap, stockByComponent, createLocation, createProject, reload } =
@@ -78,12 +86,20 @@ function TxModal({ type: initialType = 'in', componentId, componentIds, location
     const ids = componentIds?.length ? componentIds : componentId ? [componentId] : [null]
     return ids.map((id) => {
       const l = newLine(id)
-      if (id) l.locationId = presetFor(initialType) ?? pickLocation(initialType, id, [], locations, stockByComponent)
+      if (id) {
+        l.locationId = presetFor(initialType) ?? pickLocation(initialType, id, [], locations, stockByComponent)
+        l.price = suggestPrice(componentsById.get(id))
+      }
       return l
     })
   })
   const [projectId, setProjectId] = useState(null)
   const [note, setNote] = useState('')
+  // Nhập kho là hàng mua (tính vào chi tiêu ở trang Báo cáo). Cần sql/17_purchase_orders.sql.
+  const purchaseReady = useOrdersReady()
+  const [purchase, setPurchase] = useState(true)
+  const [priceToStock, setPriceToStock] = useState(true)
+  const buying = type === 'in' && purchaseReady && purchase
   const [submitting, setSubmitting] = useState(false)
   const [attempted, setAttempted] = useState(false)
   const [error, setError] = useState('')
@@ -101,6 +117,10 @@ function TxModal({ type: initialType = 'in', componentId, componentIds, location
       const q = l.qty === '' ? NaN : Number(l.qty)
       const minQ = type === 'adjust' ? 0 : 1
       if (!(q >= minQ)) errors.push(type === 'adjust' ? 'Nhập số lượng đã đếm được.' : 'Nhập số lượng lớn hơn 0.')
+      if (buying && l.price.trim() !== '') {
+        const p = parseNumber(l.price)
+        if (Number.isNaN(p) || p < 0) errors.push('Giá mua không hợp lệ, ví dụ 3500 (hoặc để trống).')
+      }
       if (errors.length) return { state: 'incomplete', errors, comp }
 
       const key = `${l.componentId}|${l.locationId}`
@@ -128,7 +148,7 @@ function TxModal({ type: initialType = 'in', componentId, componentIds, location
         noop: delta === 0,
       }
     })
-  }, [lines, type, componentsById, stockMap])
+  }, [lines, type, componentsById, stockMap, buying])
 
   const okCount = sim.filter((s) => s.state === 'ok' && !s.noop).length
 
@@ -140,6 +160,7 @@ function TxModal({ type: initialType = 'in', componentId, componentIds, location
     patchLine(line.id, {
       componentId: id,
       locationId: id ? (presetFor(type) ?? pickLocation(type, id, others, locations, stockByComponent)) : null,
+      price: suggestPrice(componentsById.get(id)),
     })
   }
 
@@ -176,6 +197,12 @@ function TxModal({ type: initialType = 'in', componentId, componentIds, location
       )
     }
 
+    // Giá mua của MỘT CÁI (ô giá nhập theo hộp / bộ nếu linh kiện tính giá như vậy)
+    const unitCost = (l) => {
+      if (l.price.trim() === '') return null
+      const pack = packOf(componentsById.get(l.componentId))
+      return parseNumber(l.price) / (pack?.qty ?? 1)
+    }
     const rows = good.map(({ l }) => ({
       component_id: l.componentId,
       location_id: l.locationId,
@@ -183,16 +210,28 @@ function TxModal({ type: initialType = 'in', componentId, componentIds, location
       quantity: Number(l.qty),
       project_id: type === 'out' ? projectId : null,
       note: note.trim() || null,
+      ...(buying ? { is_purchase: true, unit_cost: unitCost(l) } : {}),
     }))
 
     setSubmitting(true)
     const { data, error: err } = await supabase
       .from('transactions')
       .insert(rows)
-      .select('id,component_id,location_id,type,quantity,delta')
+      .select(purchaseReady ? 'id,component_id,location_id,type,quantity,delta,is_purchase,unit_cost' : 'id,component_id,location_id,type,quantity,delta')
     if (err) {
       setSubmitting(false)
       return setError(friendlyError(err))
+    }
+    // Cập nhật giá mua vào đơn giá kho nếu người dùng chọn (linh kiện chưa có giá thì luôn lấy giá mua)
+    if (buying) {
+      const updates = new Map()
+      for (const { l } of good) {
+        const cost = unitCost(l)
+        const comp = componentsById.get(l.componentId)
+        if (!(cost > 0) || Number(comp?.unit_price) === cost) continue
+        if (priceToStock || !(Number(comp?.unit_price) > 0)) updates.set(l.componentId, cost)
+      }
+      await Promise.all([...updates].map(([id, cost]) => supabase.from('components').update({ unit_price: cost }).eq('id', id)))
     }
 
     await reload()
@@ -268,7 +307,7 @@ function TxModal({ type: initialType = 'in', componentId, componentIds, location
             const showErr = s.state === 'invalid' || (attempted && s.state === 'incomplete')
             return (
               <div key={l.id} className={`kk-txline ${showErr ? 'has-error' : ''}`}>
-                <div className="kk-txline-grid">
+                <div className={`kk-txline-grid ${buying ? 'has-price' : ''}`}>
                   <Field label="Linh kiện" htmlFor={`tx-c-${l.id}`}>
                     <ComponentPicker
                       id={`tx-c-${l.id}`}
@@ -301,6 +340,18 @@ function TxModal({ type: initialType = 'in', componentId, componentIds, location
                       onChange={(v) => patchLine(l.id, { qty: v })}
                     />
                   </Field>
+                  {buying && (
+                    <Field label={priceLabel(componentsById.get(l.componentId))} htmlFor={`tx-p-${l.id}`}>
+                      <input
+                        id={`tx-p-${l.id}`}
+                        inputMode="decimal"
+                        value={l.price}
+                        placeholder="Chưa biết"
+                        disabled={!l.componentId}
+                        onChange={(e) => patchLine(l.id, { price: e.target.value })}
+                      />
+                    </Field>
+                  )}
                   <button
                     type="button"
                     className="kk-icon-btn kk-txline-remove kk-c-del"
@@ -338,6 +389,23 @@ function TxModal({ type: initialType = 'in', componentId, componentIds, location
           Thêm dòng
         </button>
 
+        {type === 'in' && purchaseReady && (
+          <div className="kk-tx-purchase">
+            <label className="kk-price-sync">
+              <input type="checkbox" checked={purchase} onChange={(e) => setPurchase(e.target.checked)} />
+              Đây là hàng mua (tính vào chi tiêu ở trang Báo cáo)
+            </label>
+            {purchase ? (
+              <label className="kk-price-sync">
+                <input type="checkbox" checked={priceToStock} onChange={(e) => setPriceToStock(e.target.checked)} />
+                Cập nhật giá mua vào đơn giá kho
+              </label>
+            ) : (
+              <small className="kk-hint">Bỏ tick khi nhập hàng có sẵn, được tặng, hoặc trả lại kho.</small>
+            )}
+          </div>
+        )}
+
         <div className="kk-form-grid kk-tx-extra">
           {type === 'out' && (
             <Field label="Dùng cho dự án (không bắt buộc)" htmlFor="tx-project">
@@ -372,6 +440,12 @@ function TxModal({ type: initialType = 'in', componentId, componentIds, location
       </div>
     </Modal>
   )
+}
+
+/** Nhãn ô giá mua: theo hộp / bộ nếu linh kiện tính giá như vậy */
+function priceLabel(comp) {
+  const pack = packOf(comp)
+  return pack ? `Giá mua / ${pack.unit}` : 'Giá mua / cái'
 }
 
 function deltaClass(delta) {

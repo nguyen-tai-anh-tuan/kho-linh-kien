@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowDownToLine, ChevronLeft, ChevronRight, ClipboardCopy, Download, ListPlus, Loader2, Search, Truck, X } from 'lucide-react'
+import { ArrowDownToLine, ChevronLeft, ChevronRight, ClipboardCopy, Download, ListPlus, Loader2, Replace, Search, Truck, X } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
 import PurchasePlan, { PlanForm, usePurchaseItems } from './PurchasePlan'
+import OrdersTab from './Orders'
+import { orderCode, pendingByComponent, useExpenses, usePurchaseOrders } from '../lib/orders'
 import { ComponentPrice } from '../ui/PriceEdit'
 import { packOf, packPrice } from '../lib/price'
 import { useBuyList } from '../data/useBuyList'
@@ -31,14 +33,20 @@ const PAGE_SIZE = 10
 
 /** Trang "Cần mua": mọi linh kiện đang hết hàng hoặc dưới mức tồn tối thiểu */
 export default function ShoppingPage() {
-  const { categoriesById, categoryChildren, toneByCategory, searchText, loading, refreshing, error, reload, version } = useData()
+  const { categoriesById, categoryChildren, toneByCategory, searchText, loading, refreshing, error, reload, version, alternates } = useData()
+  // Món tương đương đang còn hàng (sql/18): có thể dùng thay, chưa cần mua
+  const spareFor = (id) => alternates.of(id).filter((a) => !a.comp.archived_at && a.comp.total_quantity > 0)
   const { openTx } = useTx()
   const { openComponent, canEdit } = useShell()
   const toast = useToast()
   const [params, setParams] = useSearchParams()
 
-  const tab = params.get('tab') === 'plan' ? 'plan' : 'auto' // 'auto' = theo tồn kho, 'plan' = danh sách mua trước
+  // 'auto' = theo tồn kho, 'plan' = danh sách mua trước, 'orders' = đơn hàng và khoản chi khác
+  const tab = params.get('tab') === 'plan' ? 'plan' : params.get('tab') === 'orders' ? 'orders' : 'auto'
   const planItems = usePurchaseItems(version)
+  const orders = usePurchaseOrders(version)
+  const expenses = useExpenses(version)
+  const openOrderCount = (orders.rows ?? []).filter((o) => ['ordered', 'shipping', 'partial'].includes(o.status)).length
   const q = params.get('q') ?? ''
   const kind = params.get('kind') ?? ''
   const cat = params.get('cat') ?? ''
@@ -70,17 +78,24 @@ export default function ShoppingPage() {
 
   // Linh kiện đã nằm trong danh sách mua trước: để không lên danh sách (và đặt mua) hai lần
   const planReady = planItems.rows !== null && !planItems.missing && !planItems.error
+  // Kể cả phần còn chờ về của các đơn hàng đang mở (đơn hàng: sql/17)
   const planned = useMemo(() => {
     const map = new Map()
     for (const it of planItems.rows ?? []) {
       if (!it.component_id) continue
-      const p = map.get(it.component_id) ?? { quantity: 0, ordered: true }
+      const p = map.get(it.component_id) ?? { quantity: 0, ordered: true, codes: [] }
       p.quantity += it.quantity
       p.ordered = p.ordered && it.status === 'ordered'
       map.set(it.component_id, p)
     }
+    for (const [id, pend] of pendingByComponent(orders.rows)) {
+      const p = map.get(id) ?? { quantity: 0, ordered: true, codes: [] }
+      p.quantity += pend.quantity
+      p.codes = pend.orders.map((o) => orderCode(o.code_no))
+      map.set(id, p)
+    }
     return map
-  }, [planItems.rows])
+  }, [planItems.rows, orders.rows])
   const canPlan = canEdit && planReady
   const unplannedCount = toBuy.filter((c) => !planned.has(c.id)).length
   const outUnplanned = toBuy.filter((c) => c.status === 'out' && !planned.has(c.id))
@@ -196,7 +211,11 @@ export default function ShoppingPage() {
         { header: 'Trạng thái', value: (c) => stockText(c.status), tone: (c) => stockTone(c.status), width: 12 },
         {
           header: 'Danh sách mua trước',
-          value: (c) => (planned.get(c.id) ? `${planned.get(c.id).ordered ? 'Đã đặt' : 'Đã lên DS'} ${fmtNum(planned.get(c.id).quantity)}` : ''),
+          value: (c) => {
+            const p = planned.get(c.id)
+            if (!p) return ''
+            return `${p.codes.length ? `Trong đơn ${p.codes.join(', ')}` : p.ordered ? 'Đã đặt' : 'Đã lên DS'} ${fmtNum(p.quantity)}`
+          },
           width: 18,
         },
       ],
@@ -214,7 +233,7 @@ export default function ShoppingPage() {
   }
 
   const tabs = (
-    <div className="kk-seg kk-seg-2 kk-buy-tabs" role="tablist" aria-label="Loại danh sách">
+    <div className="kk-seg kk-buy-tabs kk-buy-tabs-3" role="tablist" aria-label="Loại danh sách">
       <button
         type="button"
         role="tab"
@@ -239,8 +258,37 @@ export default function ShoppingPage() {
         Danh sách mua trước
         {planItems.rows?.length > 0 && <span className="kk-badge kk-badge-plan">{fmtNum(planItems.rows.length)}</span>}
       </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={tab === 'orders'}
+        className={`kk-seg-btn ${tab === 'orders' ? 'is-on' : ''}`}
+        onClick={() => setParams(new URLSearchParams({ tab: 'orders' }), { replace: true })}
+      >
+        Đơn hàng
+        {openOrderCount > 0 && (
+          <span className="kk-badge kk-badge-plan" title="Số đơn đang chờ về">
+            {fmtNum(openOrderCount)}
+          </span>
+        )}
+      </button>
     </div>
   )
+
+  if (tab === 'orders') {
+    return (
+      <div className={`kk-page ${refreshing ? 'is-refreshing' : ''}`}>
+        <div className="kk-page-head">
+          <div>
+            <h1>Cần mua</h1>
+            <p>Theo dõi đơn hàng từ lúc đặt tới lúc nhận, và ghi các khoản chi khác để báo cáo chi tiêu được đầy đủ.</p>
+          </div>
+        </div>
+        {tabs}
+        <OrdersTab orders={orders} expenses={expenses} />
+      </div>
+    )
+  }
 
   if (tab === 'plan') {
     return (
@@ -252,7 +300,7 @@ export default function ShoppingPage() {
           </div>
         </div>
         {tabs}
-        <PurchasePlan items={planItems} />
+        <PurchasePlan items={planItems} orders={orders} />
       </div>
     )
   }
@@ -517,15 +565,30 @@ export default function ShoppingPage() {
                       <td data-label="Trạng thái">
                         <span className="kk-buy-state">
                           <StatusChip status={c.status} />
+                          {spareFor(c.id).length > 0 && (
+                            <span
+                              className="kk-alt-chip"
+                              title={`Có thể dùng thay: ${spareFor(c.id)
+                                .map((a) => `${a.comp.part_number} (còn ${fmtNum(a.comp.total_quantity)})${a.note ? `, ${a.note}` : ''}`)
+                                .join('; ')}`}
+                            >
+                              <Replace size={13} aria-hidden="true" />
+                              Có món thay thế
+                            </span>
+                          )}
                           {plan && (
                             <Link
                               className={`kk-plan-status ${plan.ordered ? 'is-ordered' : 'is-todo'}`}
-                              to="/buy?tab=plan"
-                              title={`Đã có trong danh sách mua trước: ${fmtNum(plan.quantity)}. Bấm để xem.`}
+                              to={plan.codes.length ? '/buy?tab=orders' : '/buy?tab=plan'}
+                              title={
+                                plan.codes.length
+                                  ? `Đang chờ về trong đơn ${plan.codes.join(', ')}: ${fmtNum(plan.quantity)} cái. Bấm để xem.`
+                                  : `Đã có trong danh sách mua trước: ${fmtNum(plan.quantity)}. Bấm để xem.`
+                              }
                               onClick={(e) => e.stopPropagation()}
                             >
                               {plan.ordered && <Truck size={13} />}
-                              {plan.ordered ? 'Đã đặt' : 'Đã lên DS'} ×{fmtNum(plan.quantity)}
+                              {plan.codes.length ? `Trong đơn ${plan.codes.join(', ')}` : plan.ordered ? 'Đã đặt' : 'Đã lên DS'} ×{fmtNum(plan.quantity)}
                             </Link>
                           )}
                         </span>

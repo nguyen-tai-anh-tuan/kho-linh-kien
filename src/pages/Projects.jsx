@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, ArrowUpFromLine, CheckCircle2, ChevronLeft, ChevronRight, CircuitBoard, Download, Eye, RotateCcw, Loader2, Pencil, Plus, Save, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowUpFromLine, CheckCircle2, ChevronLeft, ChevronRight, CircuitBoard, Download, Eye, RotateCcw, Loader2, Pencil, Plus, Replace, Save, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
 import { useUndoTx } from '../TxContext'
@@ -273,7 +273,9 @@ export default function ProjectsPage() {
 /* Chi tiết một dự án: bảng BOM, tình trạng đủ/thiếu, xuất kho         */
 /* ------------------------------------------------------------------ */
 function ProjectDetail({ project, lines, images, tracked, setBom, refetchBom, onEdit, onDelete }) {
-  const { componentsById, stockByComponent, locations, locationsById, reload } = useData()
+  const { componentsById, stockByComponent, locations, locationsById, reload, alternates } = useData()
+  // Dòng đang thiếu: các món tương đương còn hàng (sql/18_alternates.sql)
+  const spareFor = (compId) => alternates.of(compId).filter((a) => !a.comp.archived_at && a.comp.total_quantity > 0)
   const { openComponent, canEdit, isAdmin } = useShell()
   const toast = useToast()
   const undo = useUndoTx()
@@ -639,10 +641,27 @@ function ProjectDetail({ project, lines, images, tracked, setBom, refetchBom, on
                         Đã xuất đủ
                       </span>
                     ) : r.short > 0 ? (
-                      <span className="kk-status kk-status-low">
-                        <AlertTriangle size={14} aria-hidden="true" />
-                        Thiếu {fmtNum(r.short)}
-                      </span>
+                      <>
+                        <span className="kk-status kk-status-low">
+                          <AlertTriangle size={14} aria-hidden="true" />
+                          Thiếu {fmtNum(r.short)}
+                        </span>
+                        {spareFor(r.comp.id).length > 0 && (
+                          <span className="kk-alt-hint">
+                            <Replace size={13} aria-hidden="true" />
+                            Thay được:{' '}
+                            {spareFor(r.comp.id).map((a, i) => (
+                              <span key={a.comp.id}>
+                                {i > 0 && ', '}
+                                <button type="button" className="kk-row-link" title={a.note || a.comp.name} onClick={() => openComponent(a.comp.id)}>
+                                  {a.comp.part_number}
+                                </button>{' '}
+                                (còn {fmtNum(a.comp.total_quantity)})
+                              </span>
+                            ))}
+                          </span>
+                        )}
+                      </>
                     ) : (
                       <span className="kk-status kk-status-ok">
                         <CheckCircle2 size={14} aria-hidden="true" />

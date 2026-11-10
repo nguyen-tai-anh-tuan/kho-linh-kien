@@ -20,6 +20,7 @@ import { useToast } from './ui/Toast'
 import { Modal } from './ui/Modal'
 import { CategoryChip, Skeleton, StatusChip, StockBar } from './ui/common'
 import { ComponentPrice } from './ui/PriceEdit'
+import AlternatesSection from './AlternatesSection'
 import { friendlyError, isMissingSchema, mustChange } from './lib/api'
 import { fmtMoneyFull, fmtNum, safeUrl, timeAgo } from './lib/format'
 
@@ -322,6 +323,8 @@ export default function ComponentDrawer({ id, onClose }) {
             </tbody>
           </table>
         )}
+
+        <AlternatesSection id={id} />
 
         <h3 className="kk-sub">Lịch sử gần đây</h3>
         {history === null ? (

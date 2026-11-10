@@ -63,6 +63,13 @@ async function loadLevels() {
   return { ready: true, defaultMin: general.data.default_min_stock, rows: byCategory.data }
 }
 
+/** Nhóm linh kiện tương đương (sql/18_alternates.sql). Chưa chạy file đó thì ready = false. */
+async function loadAlternates() {
+  const res = await supabase.from('component_alternates').select('component_id,group_id,note')
+  if (res.error) return { ready: false, rows: [] }
+  return { ready: true, rows: res.data }
+}
+
 export function DataProvider({ children }) {
   const [raw, setRaw] = useState({
     components: [],
@@ -71,6 +78,7 @@ export function DataProvider({ children }) {
     locations: [],
     projects: [],
     levels: { ready: false, defaultMin: 0, rows: [] },
+    alternates: { ready: false, rows: [] },
   })
   const [status, setStatus] = useState({ loading: true, refreshing: false, error: null })
   const [version, setVersion] = useState(0)
@@ -84,7 +92,7 @@ export function DataProvider({ children }) {
         if (res.error) throw res.error
         return res.data
       }
-      const [components, stock, categories, locations, projects, levels] = await Promise.all([
+      const [components, stock, categories, locations, projects, levels, alternates] = await Promise.all([
         fetchAll(() => supabase.from('component_totals').select('*').order('id')),
         fetchAll(() =>
           supabase
@@ -101,10 +109,11 @@ export function DataProvider({ children }) {
           .then(must),
         loadProjects(),
         loadLevels(),
+        loadAlternates(),
       ])
       if (!alive.current) return
       setCategoryTree(categories.tree)
-      setRaw({ components, stock, categories: categories.rows, locations, projects, levels })
+      setRaw({ components, stock, categories: categories.rows, locations, projects, levels, alternates })
       setVersion((v) => v + 1)
       setStatus({ loading: false, refreshing: false, error: null })
     } catch (error) {
@@ -188,9 +197,27 @@ export function DataProvider({ children }) {
       ]),
     )
 
+    // Linh kiện tương đương: mỗi linh kiện -> các món khác cùng nhóm (kể cả món ngừng dùng, nơi dùng tự lọc)
+    const altByGroup = new Map()
+    for (const r of raw.alternates.rows) {
+      const list = altByGroup.get(r.group_id) ?? []
+      list.push(r)
+      altByGroup.set(r.group_id, list)
+    }
+    const altNote = new Map(raw.alternates.rows.map((r) => [r.component_id, r.note ?? '']))
+    const altGroupOf = new Map(raw.alternates.rows.map((r) => [r.component_id, r.group_id]))
+    /** [{ comp, note }] các món thay được cho linh kiện id (không gồm chính nó) */
+    const alternatesOf = (id) =>
+      (altByGroup.get(altGroupOf.get(id)) ?? [])
+        .filter((r) => r.component_id !== id)
+        .map((r) => ({ comp: componentsById.get(r.component_id), note: r.note ?? '' }))
+        .filter((x) => x.comp)
+    const alternates = { ready: raw.alternates.ready, of: alternatesOf, note: (id) => altNote.get(id) ?? '' }
+
     return {
       components,
       archivedComponents,
+      alternates,
       allComponents: raw.components,
       projects,
       projectsById,
