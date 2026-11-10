@@ -304,7 +304,7 @@ function OverviewTab({ data, core, range, goTab, onPart, onProject }) {
         </div>
       )}
 
-      <section className="kk-grid-charts">
+      <section className="kk-grid-charts kk-report-grid">
         <ReportCard
           title="Giá trị kho cuối mỗi tháng"
           summary="Ước tính: số tồn cuối tháng × đơn giá đang lưu"
@@ -404,7 +404,7 @@ function OverviewTab({ data, core, range, goTab, onPart, onProject }) {
         </ReportCard>
       </section>
 
-      <section className="kk-grid-charts">
+      <section className="kk-grid-charts kk-report-grid">
         <ReportCard
           title="Linh kiện dùng nhiều nhất"
           summary="Top 10 theo số lượng xuất dùng (đã trừ phần trả lại). Bấm để xem thẻ kho."
@@ -577,21 +577,32 @@ function SpendChartCard({ entries, range, onMonth, activeMonth, hint }) {
 /* ================================================================== */
 /* Thẻ Nhập – Xuất – Tồn                                               */
 /* ================================================================== */
+// Bộ lọc của bảng nhập – xuất – tồn
+const MOVE_KINDS = [
+  { key: '', label: 'Tất cả', test: () => true, hint: 'Mọi linh kiện đang dùng' },
+  { key: 'buy', label: 'Có nhập mua', test: (r) => r.buy > 0, hint: 'Có mua thêm trong kỳ' },
+  { key: 'out', label: 'Có xuất', test: (r) => r.out > 0, hint: 'Có xuất kho trong kỳ' },
+  { key: 'adj', label: 'Có điều chỉnh', test: (r) => r.adj !== 0, hint: 'Kiểm kê làm tồn kho thay đổi' },
+  { key: 'none', label: 'Không đổi', test: (r) => r.count === 0, hint: 'Không có giao dịch nào trong kỳ' },
+]
+
 function StockTab({ rows, range, openValue, closeValue, onRow }) {
   const { categoriesById, categoryChildren } = useData()
   const [q, setQ] = useState('')
   const [cat, setCat] = useState('')
-  const [changedOnly, setChangedOnly] = useState(true)
+  const [kind, setKind] = useState('')
 
-  const list = useMemo(() => {
+  // Lọc theo tên và danh mục trước, rồi đếm từng loại thay đổi để hiện trên nút lọc
+  const base = useMemo(() => {
     const terms = normalize(q).split(/\s+/).filter(Boolean)
     const catIds = cat && cat !== 'none' ? new Set(subtreeIds(categoryChildren, cat)) : null
     return rows
-      .filter((r) => (changedOnly ? r.count > 0 : r.count > 0 || r.close > 0 || !r.archived))
+      .filter((r) => r.count > 0 || r.close > 0 || !r.archived)
       .filter((r) => (cat === 'none' ? !r.categoryId : !catIds || catIds.has(r.categoryId)))
       .filter((r) => !terms.length || terms.every((t) => normalize(`${r.part} ${r.name}`).includes(t)))
       .sort((a, b) => b.count - a.count || a.part.localeCompare(b.part, 'vi', { numeric: true }))
-  }, [rows, q, cat, changedOnly, categoryChildren])
+  }, [rows, q, cat, categoryChildren])
+  const list = base.filter(MOVE_KINDS.find((k) => k.key === kind)?.test ?? (() => true))
 
   const sum = (key) => list.reduce((s, r) => s + r[key], 0)
   const foot = { open: sum('open'), buy: sum('buy'), inOther: sum('inOther'), out: sum('out'), adj: sum('adj'), close: sum('close'), value: sum('value') }
@@ -617,13 +628,24 @@ function StockTab({ rows, range, openValue, closeValue, onRow }) {
               <input type="search" value={q} placeholder="Tìm mã, tên linh kiện…" aria-label="Tìm linh kiện" onChange={(e) => setQ(e.target.value)} />
             </div>
             <CategoryFilter value={cat} onChange={setCat} />
-            <button type="button" className={`kk-pill ${changedOnly ? 'is-on' : ''}`} aria-pressed={changedOnly} onClick={() => setChangedOnly((v) => !v)}>
-              Chỉ món có thay đổi
-            </button>
+            <div className="kk-pills" role="group" aria-label="Lọc theo loại thay đổi trong kỳ">
+              {MOVE_KINDS.map((k) => (
+                <button
+                  key={k.key}
+                  type="button"
+                  className={`kk-pill ${kind === k.key ? 'is-on' : ''}`}
+                  aria-pressed={kind === k.key}
+                  title={k.hint}
+                  onClick={() => setKind(k.key)}
+                >
+                  {k.label} ({fmtNum(base.filter(k.test).length)})
+                </button>
+              ))}
+            </div>
           </div>
         }
         empty={list.length === 0}
-        emptyText={changedOnly ? 'Không có linh kiện nào thay đổi trong kỳ (theo bộ lọc đang chọn).' : 'Không có linh kiện nào khớp bộ lọc.'}
+        emptyText="Không có linh kiện nào khớp bộ lọc đang chọn."
         table={{
           rows: list,
           onRow: (r) => onRow(r.id),
@@ -701,7 +723,7 @@ function SpendTab({ ready, entries, prevTotal, range, month, setMonth, onPart })
 
       <SpendChartCard entries={entries} range={range} onMonth={(m) => setMonth(m === month ? '' : m)} activeMonth={month} hint="Bấm vào một cột để lọc theo tháng." />
 
-      <section className="kk-grid-charts kk-grid-even">
+      <section className="kk-grid-charts kk-report-grid">
         <ReportCard
           title="Theo nơi mua"
           summary={`Tiền linh kiện và phí ship · ${scope}`}
@@ -856,7 +878,7 @@ function AdjustTab({ adj, prev, range, onPart }) {
         <StatCard Icon={Coins} label="Chênh lệch ròng" value={signedMoney(adj.net)} note={compareText(Math.abs(adj.net), Math.abs(prev.net)) || 'hụt + dư'} />
       </section>
 
-      <section className="kk-grid-charts">
+      <section className="kk-grid-charts kk-report-grid">
         <ReportCard
           title="Từng lần điều chỉnh"
           summary="Số trên sổ trước khi đếm → số đếm được thực tế. Bấm vào dòng để xem thẻ kho."

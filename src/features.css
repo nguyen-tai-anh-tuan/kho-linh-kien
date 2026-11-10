@@ -236,13 +236,31 @@
   overflow: auto;
 }
 .kk-report-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
   margin-bottom: 16px;
+}
+/* Hai khung cạnh nhau: chia đều hai cột, khung nào nội dung rộng thì cuộn bên trong chứ không đẩy lệch cột */
+.kk-grid-charts.kk-report-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+}
+/* Biểu đồ giãn ra cho bằng chiều cao khung bên cạnh (không để khoảng trống phía dưới) */
+.kk-report-card > .kk-chart {
+  flex: 1 1 auto;
+}
+.kk-report-card > .kk-report-table {
+  flex: 0 1 auto;
+}
+.kk-report-card > .kk-card-head {
+  align-items: flex-start;
+}
+.kk-report-card .kk-card-sub {
+  max-width: 62ch;
 }
 .kk-grid-charts > .kk-report-card {
   margin-bottom: 0;
-}
-.kk-grid-charts.kk-grid-even {
-  grid-template-columns: 1fr 1fr;
 }
 /* Thanh chọn kỳ báo cáo và các thẻ */
 .kk-report-bar {
@@ -291,6 +309,8 @@
   color: var(--text);
 }
 .kk-report-filters {
+  /* Bảng chọn danh mục bung ra ngay dưới hàng lọc này */
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -336,7 +356,7 @@
   font-variant-numeric: tabular-nums;
 }
 .kk-report-table .kk-cell-clip {
-  max-width: 260px;
+  max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -523,7 +543,7 @@
 }
 
 @media (max-width: 1180px) {
-  .kk-grid-charts.kk-grid-even {
-    grid-template-columns: 1fr;
+  .kk-grid-charts.kk-report-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
