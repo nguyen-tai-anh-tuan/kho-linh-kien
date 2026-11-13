@@ -1,0 +1,161 @@
+/* =====================================================================
+   Chuyển vị trí + chỗ cất mặc định (tiền tố kk-mv-)
+   ===================================================================== */
+
+.kk-mv-dest {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--kk-soft);
+}
+.kk-mv-dest .kk-field {
+  margin: 0;
+}
+.kk-mv-hint {
+  display: block;
+  margin: 10px 0 0;
+}
+
+/* Danh sách món đã chọn (gán chỗ cất) */
+.kk-mv-picked {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.kk-mv-picked li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.kk-mv-picked-main {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.kk-mv-picked-main small {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+/* Ô chỗ cất trong khung chi tiết */
+.kk-mv-home {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 10px;
+  font-size: 0.88rem;
+}
+.kk-mv-home > span:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.kk-portal .kk-mv-home-select,
+.kk .kk-mv-home-select {
+  flex: 1 1 200px;
+  width: auto !important;
+  height: 36px !important;
+}
+
+/* Nút nhỏ trên từng dòng bảng (Chuyển / Bỏ gán) */
+.kk-mv-rowbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.kk-mv-rowbtn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--kk-link);
+}
+.kk-mini-table .kk-mv-col-act {
+  width: 1%;
+  text-align: right;
+}
+
+/* Nhãn "chỗ cất" */
+.kk-mv-homechip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: var(--kk-soft);
+  color: var(--kk-link);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.kk-mv-homechip-empty {
+  background: var(--kk-warn-bg);
+  color: var(--kk-warn);
+}
+.kk-mv-muted {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Lịch sử: loại "Chuyển vị trí" */
+.kk-type-move {
+  background: color-mix(in srgb, var(--kk-plan) 14%, var(--card));
+}
+.kk-type-move svg,
+.kk-ico-move {
+  color: var(--kk-plan);
+}
+.kk-ico-move {
+  background: color-mix(in srgb, var(--kk-plan) 14%, var(--card));
+}
+.kk-mv-route {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+}
+.kk-mv-route svg {
+  flex: none;
+  color: var(--muted);
+}
+
+/* Trang Vị trí: cột chọn + thanh thao tác */
+.kk-mv-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--primary) 10%, var(--card));
+}
+.kk-mv-rowact {
+  width: 1%;
+  white-space: nowrap;
+}
+tr.kk-mv-homerow td {
+  background: color-mix(in srgb, var(--kk-warn-bg) 35%, transparent);
+}
+
+.kk-mv-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

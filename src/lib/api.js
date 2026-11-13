@@ -44,9 +44,12 @@ export function friendlyError(error) {
   if (msg.includes('LINE_RECEIVED')) return 'Món này đã nhận một phần nên không bỏ khỏi đơn được. Hãy dùng "Đóng đơn" nếu không chờ phần còn lại.'
   if (msg.includes('ALT_SAME')) return 'Hãy chọn một linh kiện khác với linh kiện đang xem.'
 
+  if (msg.includes('MOVE_SAME')) return 'Ngăn chuyển đến phải khác ngăn đang chứa hàng.'
+  if (msg.includes('MOVE_INVALID')) return 'Có dòng chuyển vị trí chưa đủ thông tin (linh kiện, ngăn cũ, ngăn mới, số lượng).'
   if (msg.includes('INSUFFICIENT_STOCK')) {
     const detail = error?.details ? ` (${error.details})` : ''
-    return `Không đủ tồn kho để xuất${detail}. Hãy giảm số lượng hoặc kiểm tra lại vị trí.`
+    const what = String(error?.details ?? '').includes('chuyển') ? 'chuyển' : 'xuất'
+    return `Không đủ tồn kho để ${what}${detail}. Hãy giảm số lượng hoặc kiểm tra lại vị trí.`
   }
   if (code === '23503') {
     return 'Dữ liệu này đang được dùng ở nơi khác (ví dụ linh kiện đã có lịch sử nhập/xuất) nên chưa thể xóa. Với linh kiện, hãy bấm "Ngừng dùng" để ẩn nó đi.'

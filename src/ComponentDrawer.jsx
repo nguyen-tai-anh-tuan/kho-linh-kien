@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ArrowDownToLine,
+  ArrowRightLeft,
   ArrowUpFromLine,
+  MapPin,
   EyeOff,
   ExternalLink,
   FileText,
@@ -21,13 +23,16 @@ import { Modal } from './ui/Modal'
 import { CategoryChip, Skeleton, StatusChip, StockBar } from './ui/common'
 import { ComponentPrice } from './ui/PriceEdit'
 import AlternatesSection from './AlternatesSection'
+import MoveDialog from './MoveDialog'
+import { HomePicker } from './HomeDialog'
 import { friendlyError, isMissingSchema, mustChange } from './lib/api'
 import { fmtMoneyFull, fmtNum, safeUrl, timeAgo } from './lib/format'
 
-const TYPE_LABEL = { in: 'Nhập', out: 'Xuất', adjust: 'Điều chỉnh' }
+const TYPE_LABEL = { in: 'Nhập', out: 'Xuất', adjust: 'Điều chỉnh', move: 'Chuyển' }
 
 export default function ComponentDrawer({ id, onClose }) {
-  const { componentsById, stockByComponent, categoriesById, toneByCategory, projectCode, loading, version, reload } = useData()
+  const { componentsById, stockByComponent, categoriesById, toneByCategory, projectCode, loading, version, reload, moves } =
+    useData()
   const { openTx } = useTx()
   const { openForm, canEdit, isAdmin } = useShell()
   const toast = useToast()
@@ -38,15 +43,15 @@ export default function ComponentDrawer({ id, onClose }) {
   const [deleting, setDeleting] = useState(false)
   const [archiving, setArchiving] = useState(false)
   const [imgFailed, setImgFailed] = useState(false)
+  const [moveFrom, setMoveFrom] = useState(null) // ngăn đang mở hộp thoại chuyển
 
   useEffect(() => {
     let off = false
-    supabase
-      .from('transactions_feed')
-      .select('*')
-      .eq('component_id', id)
-      .order('created_at', { ascending: false })
-      .limit(15)
+    // Lịch sử gộp có cả các lần chuyển vị trí (sql/19); chưa chạy file đó thì dùng lịch sử cũ
+    const recent = (view) =>
+      supabase.from(view).select('*').eq('component_id', id).order('created_at', { ascending: false }).limit(15)
+    recent('history_feed')
+      .then((res) => (res.error && isMissingSchema(res.error) ? recent('transactions_feed') : res))
       .then(({ data, error }) => {
         if (off) return
         setHistory(error ? { error: friendlyError(error) } : data)
@@ -303,6 +308,15 @@ export default function ComponentDrawer({ id, onClose }) {
         )}
 
         <h3 className="kk-sub">Tồn theo vị trí</h3>
+        {moves.homesReady && (
+          <div className="kk-mv-home">
+            <span>
+              <MapPin size={15} aria-hidden="true" />
+              Chỗ cất mặc định
+            </span>
+            <HomePicker comp={c} canEdit={canEdit && !archived} />
+          </div>
+        )}
         {where.length === 0 ? (
           <p className="kk-muted-text">{canEdit ? 'Chưa có hàng ở vị trí nào. Bấm Nhập để thêm.' : 'Chưa có hàng ở vị trí nào.'}</p>
         ) : (
@@ -311,6 +325,11 @@ export default function ComponentDrawer({ id, onClose }) {
               <tr>
                 <th>Vị trí</th>
                 <th className="is-num">Số lượng</th>
+                {moves.ready && canEdit && !archived && (
+                  <th className="kk-mv-col-act">
+                    <span className="kk-mv-sr">Chuyển</span>
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -318,6 +337,19 @@ export default function ComponentDrawer({ id, onClose }) {
                 <tr key={w.location_id}>
                   <td>{w.path}</td>
                   <td className="is-num">{fmtNum(w.quantity)}</td>
+                  {moves.ready && canEdit && !archived && (
+                    <td className="kk-mv-col-act">
+                      <button
+                        type="button"
+                        className="kk-mv-rowbtn"
+                        title="Chuyển sang ngăn khác"
+                        onClick={() => setMoveFrom(w.location_id)}
+                      >
+                        <ArrowRightLeft size={14} aria-hidden="true" />
+                        Chuyển
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -340,13 +372,27 @@ export default function ComponentDrawer({ id, onClose }) {
           <ul className="kk-history">
             {history.map((t) => (
               <li key={t.id}>
-                <span className={`kk-list-ico ${t.type === 'in' ? 'kk-ico-in' : t.type === 'out' ? 'kk-ico-out' : 'kk-ico-adj'}`}>
-                  {t.type === 'in' ? <ArrowDownToLine size={16} /> : t.type === 'out' ? <ArrowUpFromLine size={16} /> : <SlidersHorizontal size={16} />}
+                <span
+                  className={`kk-list-ico ${t.type === 'in' ? 'kk-ico-in' : t.type === 'out' ? 'kk-ico-out' : t.type === 'move' ? 'kk-ico-move' : 'kk-ico-adj'}`}
+                >
+                  {t.type === 'in' ? (
+                    <ArrowDownToLine size={16} />
+                  ) : t.type === 'out' ? (
+                    <ArrowUpFromLine size={16} />
+                  ) : t.type === 'move' ? (
+                    <ArrowRightLeft size={16} />
+                  ) : (
+                    <SlidersHorizontal size={16} />
+                  )}
                 </span>
                 <span className="kk-list-main">
                   <span>
-                    {TYPE_LABEL[t.type]} {t.type === 'adjust' ? `còn ${fmtNum(t.quantity)}` : fmtNum(t.quantity)}
-                    {t.location_path ? `, ${t.location_path}` : ''}
+                    {TYPE_LABEL[t.type] ?? t.type} {t.type === 'adjust' ? `còn ${fmtNum(t.quantity)}` : fmtNum(t.quantity)}
+                    {t.type === 'move'
+                      ? `, ${t.location_path ?? '?'} → ${t.to_location_path ?? '?'}`
+                      : t.location_path
+                        ? `, ${t.location_path}`
+                        : ''}
                     {t.project_name ? `, ${projectCode(t.project_id) || `dự án ${t.project_name}`}` : ''}
                   </span>
                   <small>
@@ -365,6 +411,9 @@ export default function ComponentDrawer({ id, onClose }) {
           </Link>
         )}
       </div>
+      {moveFrom && (
+        <MoveDialog lines={[{ componentId: id, fromLocationId: moveFrom }]} onClose={() => setMoveFrom(null)} />
+      )}
     </Modal>
   )
 }

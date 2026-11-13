@@ -73,7 +73,7 @@ const newLine = (componentId = null) => ({ id: ++lineSeq, componentId, locationI
 const suggestPrice = (comp) => (Number(comp?.unit_price) > 0 ? String(packPrice(comp.unit_price, packOf(comp))) : '')
 
 function TxModal({ type: initialType = 'in', componentId, componentIds, locationId: presetLocationId, onClose }) {
-  const { componentsById, locations, projects, stockMap, stockByComponent, createLocation, createProject, reload } =
+  const { componentsById, locations, projects, stockMap, stockByComponent, createLocation, createProject, reload, homeOf } =
     useData()
   const toast = useToast()
   const undo = useUndoTx()
@@ -87,7 +87,7 @@ function TxModal({ type: initialType = 'in', componentId, componentIds, location
     return ids.map((id) => {
       const l = newLine(id)
       if (id) {
-        l.locationId = presetFor(initialType) ?? pickLocation(initialType, id, [], locations, stockByComponent)
+        l.locationId = presetFor(initialType) ?? pickLocation(initialType, id, [], locations, stockByComponent, homeOf.get(id))
         l.price = suggestPrice(componentsById.get(id))
       }
       return l
@@ -159,7 +159,7 @@ function TxModal({ type: initialType = 'in', componentId, componentIds, location
     const others = lines.filter((l) => l.id !== line.id)
     patchLine(line.id, {
       componentId: id,
-      locationId: id ? (presetFor(type) ?? pickLocation(type, id, others, locations, stockByComponent)) : null,
+      locationId: id ? (presetFor(type) ?? pickLocation(type, id, others, locations, stockByComponent, homeOf.get(id))) : null,
       price: suggestPrice(componentsById.get(id)),
     })
   }
@@ -176,7 +176,7 @@ function TxModal({ type: initialType = 'in', componentId, componentIds, location
         )
         if (valid) return l
         const others = ls.filter((_, j) => j !== i)
-        return { ...l, locationId: pickLocation(next, l.componentId, others, locations, stockByComponent) }
+        return { ...l, locationId: pickLocation(next, l.componentId, others, locations, stockByComponent, homeOf.get(l.componentId)) }
       }),
     )
   }
@@ -466,11 +466,15 @@ function locationOptions(type, componentId, locations, stockMap, stockByComponen
   })
 }
 
-/** Gợi ý vị trí mặc định: nơi đang có nhiều hàng nhất, hoặc vị trí vừa dùng ở dòng trước */
-function pickLocation(type, componentId, otherLines, locations, stockByComponent) {
+/**
+ * Gợi ý vị trí mặc định: nơi đang có nhiều hàng nhất, rồi tới chỗ cất mặc định của linh kiện
+ * (sql/19_move_stock.sql), hoặc vị trí vừa dùng ở dòng trước
+ */
+function pickLocation(type, componentId, otherLines, locations, stockByComponent, home) {
   const have = [...(stockByComponent.get(componentId) ?? [])].sort((a, b) => b.quantity - a.quantity)
   if (have.length > 0) return have[0].location_id
   if (type === 'out') return null
+  if (home) return home
   const prev = [...otherLines].reverse().find((l) => l.locationId)
   if (prev) return prev.locationId
   return locations.length === 1 ? locations[0].id : null

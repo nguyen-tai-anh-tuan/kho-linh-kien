@@ -473,6 +473,24 @@
   color: var(--muted);
 }
 
+/* Vị trí rút gọn: một dòng, tên ngăn cuối + số chỗ khác */
+.kk-cp-loc1 {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 160px;
+  white-space: nowrap;
+}
+.kk-cp-loc1-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kk-cp-loc1.is-hit .kk-cp-loc1-name {
+  font-weight: 700;
+  color: var(--kk-link);
+}
+
 @media (max-width: 720px) {
   .kk-cp-stockcell {
     justify-items: end;
@@ -480,4 +498,11 @@
   .kk-cp-unit-label {
     display: none;
   }
+}
+
+/* Chuyển vị trí / chỗ cất mặc định */
+.kk-cp-ev-move svg { color: var(--kk-plan); }
+.kk-cp-loc1-home .kk-cp-loc1-name {
+  color: var(--muted);
+  font-style: italic;
 }

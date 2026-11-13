@@ -5,6 +5,7 @@ import {
   ArrowDownUp,
   ArrowUp,
   ArrowDown,
+  ArrowRightLeft,
   ArrowUpFromLine,
   ChevronDown,
   ChevronLeft,
@@ -19,6 +20,7 @@ import {
 import { useData } from '../data/DataContext'
 import { lastEvent, sumEvents, useActivity } from '../data/useActivity'
 import { useTx } from '../TxContext'
+import MoveDialog from '../MoveDialog'
 import { useShell } from '../ShellContext'
 import { CategoryChip, EmptyState, RowThumb, Skeleton, StatusChip, StockBar } from '../ui/common'
 import { datedName, stockText, stockTone } from '../lib/xlsx'
@@ -136,6 +138,8 @@ export default function ComponentsPage() {
     error,
     reload,
     version,
+    homeOf,
+    moves,
   } = useData()
   const { openTx } = useTx()
   const { openComponent, openForm, openImport, canEdit } = useShell()
@@ -149,6 +153,7 @@ export default function ComponentsPage() {
   })
   const [panelOpen, setPanelOpen] = useState(() => readStore(PANEL_KEY, '0') === '1')
   const [selected, setSelected] = useState(() => new Set())
+  const [moveLines, setMoveLines] = useState(null) // mở hộp thoại chuyển vị trí
   const xlsx = useXlsxExport()
 
   const q = params.get('q') ?? ''
@@ -299,7 +304,8 @@ export default function ComponentsPage() {
       if (cat === 'none' && c.category_id) return false
       if (catIds && !catIds.has(c.category_id)) return false
       if (pkg && c.package !== pkg) return false
-      if (loc && !(stockByComponent.get(c.id) ?? []).some((s) => s.location_id === loc)) return false
+      // Lọc theo vị trí: món có hàng ở đó, hoặc được gán chỗ cất ở đó (kể cả chưa có hàng)
+      if (loc && homeOf.get(c.id) !== loc && !(stockByComponent.get(c.id) ?? []).some((s) => s.location_id === loc)) return false
       if (noPrice && Number(c.unit_price) > 0) return false
       if (qmin !== null || qmax !== null) {
         // Đã chọn vị trí thì so số lượng tại đúng vị trí đó, chưa chọn thì so tổng tồn
@@ -326,6 +332,7 @@ export default function ComponentsPage() {
     searchIndex,
     stockByComponent,
     stockMap,
+    homeOf,
     categoryChildren,
     q,
     cat,
@@ -744,6 +751,23 @@ export default function ComponentsPage() {
               Nhập / xuất các mục này
             </button>
           )}
+          {canEdit && moves.ready && !arc && (
+            <button
+              type="button"
+              className="kk-btn kk-btn-soft kk-btn-sm"
+              title="Chuyển toàn bộ hàng của các món đã chọn sang một ngăn khác"
+              onClick={() =>
+                setMoveLines(
+                  [...selected].flatMap((id) =>
+                    (stockByComponent.get(id) ?? []).map((w) => ({ componentId: id, fromLocationId: w.location_id, qty: w.quantity })),
+                  ),
+                )
+              }
+            >
+              <ArrowRightLeft size={16} />
+              Chuyển vị trí các mục này
+            </button>
+          )}
           <button type="button" className="kk-btn kk-btn-soft kk-btn-sm" onClick={exportXlsx} disabled={xlsx.busy}>
             <Download size={16} />
             Xuất Excel
@@ -916,17 +940,26 @@ export default function ComponentsPage() {
                         </td>
                         <td data-label="Vị trí" className="kk-col-loc">
                           {where.length === 0 ? (
-                            '—'
+                            homeOf.get(c.id) ? (
+                              // Chưa có hàng nhưng đã gán chỗ cất
+                              <span
+                                className="kk-cp-loc1 kk-cp-loc1-home"
+                                title={`Chỗ cất mặc định (chưa có hàng): ${locationsById.get(homeOf.get(c.id))?.path ?? ''}`}
+                              >
+                                <span className="kk-cp-loc1-name">{locationsById.get(homeOf.get(c.id))?.name}</span>
+                              </span>
+                            ) : (
+                              '—'
+                            )
                           ) : (
-                            <div className="kk-cp-locs" title={where.map((w) => `${w.path}: ${fmtNum(w.quantity)}`).join('\n')}>
-                              {where.slice(0, 2).map((w) => (
-                                <span key={w.location_id} className={`kk-cp-loc ${w.location_id === loc ? 'is-hit' : ''}`}>
-                                  <span className="kk-cp-loc-path">{w.path}</span>
-                                  <b className="kk-cp-loc-qty">{fmtNum(w.quantity)}</b>
-                                </span>
-                              ))}
-                              {where.length > 2 && <em className="kk-more">+{where.length - 2} chỗ khác</em>}
-                            </div>
+                            // Gọn: chỉ tên ngăn cuối (vd "Ngăn 2A-1"), đường dẫn đầy đủ khi rê chuột hoặc mở chi tiết
+                            <span
+                              className={`kk-cp-loc1 ${where[0].location_id === loc ? 'is-hit' : ''}`}
+                              title={where.map((w) => `${w.path}: ${fmtNum(w.quantity)} cái`).join('\n')}
+                            >
+                              <span className="kk-cp-loc1-name">{locationsById.get(where[0].location_id)?.name ?? where[0].path}</span>
+                              {where.length > 1 && <em className="kk-more">+{where.length - 1}</em>}
+                            </span>
                           )}
                         </td>
                         <td data-label="Tồn kho">
@@ -936,7 +969,14 @@ export default function ComponentsPage() {
                           </div>
                         </td>
                         <td data-label="Hoạt động" className="kk-col-activity">
-                          <ActivityCell ev={ev} loading={activity.status === 'loading'} periodSum={periodSum} act={act} now={nowMs} />
+                          <ActivityCell
+                            ev={ev}
+                            loading={activity.status === 'loading'}
+                            periodSum={periodSum}
+                            act={act}
+                            now={nowMs}
+                            placeName={(id) => locationsById.get(id)?.name ?? '?'}
+                          />
                         </td>
                         <td data-label="Giá trị" className="kk-col-money is-num">
                           <div className="kk-cp-money">
@@ -1019,6 +1059,7 @@ export default function ComponentsPage() {
           </>
         )}
       </div>
+      {moveLines && <MoveDialog lines={moveLines} onClose={() => setMoveLines(null)} />}
     </div>
   )
 }
@@ -1028,15 +1069,17 @@ const EV = {
   out: { Icon: ArrowUpFromLine, label: 'Xuất', cls: 'out' },
   adjust: { Icon: SlidersHorizontal, label: 'Kiểm kê', cls: 'adjust' },
   new: { Icon: PackagePlus, label: 'Thêm vào kho', cls: 'new' },
+  move: { Icon: ArrowRightLeft, label: 'Chuyển', cls: 'move' },
 }
 
 /** Cột "Hoạt động gần nhất": loại giao dịch, số lượng và bao lâu trước */
-function ActivityCell({ ev, loading, periodSum, act, now }) {
+function ActivityCell({ ev, loading, periodSum, act, now, placeName }) {
   if (!ev) return loading ? <span className="kk-cp-muted">…</span> : <span className="kk-cp-muted">Chưa có</span>
   const e = EV[ev.type] ?? EV.adjust
   let amount = ''
   if (ev.type === 'in') amount = ` +${fmtNum(ev.quantity)}`
   else if (ev.type === 'out') amount = ` −${fmtNum(ev.quantity)}`
+  else if (ev.type === 'move') amount = ` ${fmtNum(ev.quantity)} → ${placeName(ev.to)}`
   else if (ev.type === 'adjust') {
     const dlt = Number(ev.delta)
     amount = !Number.isFinite(dlt) || ev.delta === null ? ` còn ${fmtNum(ev.quantity)}` : dlt === 0 ? ' (khớp)' : ` ${dlt > 0 ? '+' : '−'}${fmtNum(Math.abs(dlt))}`

@@ -1,6 +1,19 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowDownToLine, ChevronDown, ChevronLeft, ChevronRight, FolderPlus, Pencil, Plus, Trash2 } from 'lucide-react'
+import {
+  ArrowDownToLine,
+  ArrowRightLeft,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  FolderPlus,
+  MapPin,
+  MapPinOff,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
 import { useTx } from '../TxContext'
@@ -8,7 +21,10 @@ import { useShell } from '../ShellContext'
 import { useToast } from '../ui/Toast'
 import { ConfirmDialog, NameDialog } from '../ui/dialogs'
 import { EmptyState, RowThumb, Skeleton, StatusChip } from '../ui/common'
-import { mustChange } from '../lib/api'
+import { friendlyError, mustChange } from '../lib/api'
+import { setHome } from '../lib/moves'
+import MoveDialog from '../MoveDialog'
+import HomeDialog from '../HomeDialog'
 import { buildTree, subtreeIds } from '../lib/tree'
 import { fmtNum, normalize } from '../lib/format'
 
@@ -18,7 +34,7 @@ const PAGE_SIZE = 10 // số linh kiện trên một trang của bảng bên ph�
 const levelName = (depth) => LEVELS[Math.min(depth, LEVELS.length - 1)]
 
 export default function LocationsPage() {
-  const { locations, locationsById, componentsById, stock, loading, refreshing, error, reload } = useData()
+  const { locations, locationsById, componentsById, stock, loading, refreshing, error, reload, homeOf, moves } = useData()
   const { openTx } = useTx()
   const { openComponent, canEdit, isAdmin } = useShell()
   const toast = useToast()
@@ -27,6 +43,9 @@ export default function LocationsPage() {
   const [includeSub, setIncludeSub] = useState(true)
   const [dialog, setDialog] = useState(null) // { kind: 'add' | 'rename' | 'delete', loc }
   const [paging, setPaging] = useState({ key: '', page: 0 }) // trang đang xem của từng vị trí
+  const [picked, setPicked] = useState({ key: '', set: new Set() }) // các dòng đang tick để chuyển cả loạt
+  const [moveDlg, setMoveDlg] = useState(null) // { lines, to }
+  const [homeDlg, setHomeDlg] = useState(false)
 
   const childrenOf = useMemo(() => buildTree(locations), [locations])
 
@@ -83,14 +102,33 @@ export default function LocationsPage() {
         out.push({
           key: `${s.component_id}|${id}`,
           comp,
+          locationId: id,
           quantity: s.quantity,
+          isHome: homeOf.get(s.component_id) === id,
           // Đường dẫn tính từ vị trí đang xem, để biết món nằm ở ngăn con nào
           inside: id === selected.id ? '' : (loc?.path ?? '').slice(selected.path.length + 3),
         })
       }
     }
+    // Món được gán chỗ cất ở đây nhưng hiện chưa có hàng ở đây (sql/19_move_stock.sql)
+    const idSet = new Set(ids)
+    const hasHere = new Set(out.map((r) => r.key))
+    for (const [compId, locId] of homeOf) {
+      if (!idSet.has(locId) || hasHere.has(`${compId}|${locId}`)) continue
+      const comp = componentsById.get(compId)
+      if (!comp || comp.archived_at) continue
+      const loc = locationsById.get(locId)
+      out.push({
+        key: `${compId}|${locId}|home`,
+        comp,
+        locationId: locId,
+        quantity: 0,
+        homeOnly: true,
+        inside: locId === selected.id ? '' : (loc?.path ?? '').slice(selected.path.length + 3),
+      })
+    }
     return out.sort((a, b) => a.comp.part_number.localeCompare(b.comp.part_number, 'vi', { numeric: true }))
-  }, [selected, includeSub, childrenOf, itemsAt, locationsById, componentsById])
+  }, [selected, includeSub, childrenOf, itemsAt, locationsById, componentsById, homeOf])
 
   function select(id) {
     setParams(
@@ -167,6 +205,31 @@ export default function LocationsPage() {
   const page = Math.min(paging.key === pagingKey ? paging.page : 0, pageCount - 1)
   const pageRows = rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
   const goTo = (n) => setPaging({ key: pagingKey, page: n })
+
+  // Tick để chuyển cả loạt (chỉ các dòng đang có hàng). Đổi vị trí đang xem thì bỏ hết dấu tick.
+  const canMove = canEdit && moves.ready
+  const stockRows = rows.filter((r) => !r.homeOnly)
+  const pickedSet = picked.key === pagingKey ? picked.set : new Set()
+  const pickedRows = stockRows.filter((r) => pickedSet.has(r.key))
+  const allPicked = stockRows.length > 0 && pickedRows.length === stockRows.length
+  const togglePick = (key) => {
+    const next = new Set(pickedSet)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    setPicked({ key: pagingKey, set: next })
+  }
+  const togglePickAll = () => setPicked({ key: pagingKey, set: allPicked ? new Set() : new Set(stockRows.map((r) => r.key)) })
+  const linesOf = (list) => list.map((r) => ({ componentId: r.comp.id, fromLocationId: r.locationId, qty: r.quantity }))
+
+  async function unassign(r) {
+    try {
+      await setHome([r.comp.id], null)
+      await reload()
+      toast.push({ message: `Đã bỏ gán ${r.comp.part_number} khỏi ${locationsById.get(r.locationId)?.path ?? 'vị trí này'}.` })
+    } catch (e) {
+      toast.push({ tone: 'error', message: friendlyError(e), duration: 9000 })
+    }
+  }
 
   return (
     <div className={`kk-page ${refreshing ? 'is-refreshing' : ''}`}>
@@ -257,9 +320,11 @@ export default function LocationsPage() {
                 <div className="kk-pane-titles">
                   <h2>{selected.path}</h2>
                   <p className="kk-card-sub">
-                    {rows.length === 0
-                      ? 'Chưa có hàng'
-                      : `${fmtNum(rows.length)} dòng, tổng ${fmtNum(totalQty)} cái`}
+                    {stockRows.length === 0
+                      ? rows.length
+                        ? `Chưa có hàng, ${fmtNum(rows.length)} món được gán chỗ cất ở đây`
+                        : 'Chưa có hàng'
+                      : `${fmtNum(stockRows.length)} dòng, tổng ${fmtNum(totalQty)} cái${rows.length > stockRows.length ? `, thêm ${fmtNum(rows.length - stockRows.length)} món gán chỗ cất` : ''}`}
                   </p>
                 </div>
                 {canEdit && (
@@ -272,6 +337,28 @@ export default function LocationsPage() {
                       <ArrowDownToLine size={16} />
                       Nhập vào đây
                     </button>
+                    {canMove && (
+                      <button
+                        type="button"
+                        className="kk-btn kk-btn-outline kk-btn-sm"
+                        title="Đưa hàng đang nằm ở ngăn khác vào đây"
+                        onClick={() => setMoveDlg({ lines: [], to: selected.id })}
+                      >
+                        <ArrowRightLeft size={16} />
+                        Chuyển hàng vào đây
+                      </button>
+                    )}
+                    {moves.homesReady && (
+                      <button
+                        type="button"
+                        className="kk-btn kk-btn-outline kk-btn-sm"
+                        title="Đặt đây làm chỗ cất mặc định cho linh kiện, kể cả món chưa có hàng"
+                        onClick={() => setHomeDlg(true)}
+                      >
+                        <MapPin size={16} />
+                        Gán linh kiện
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="kk-btn kk-btn-outline kk-btn-sm"
@@ -336,19 +423,71 @@ export default function LocationsPage() {
                   )}
                 </EmptyState>
               ) : (
+                <>
+                {canMove && pickedRows.length > 0 && (
+                  <div className="kk-mv-bulk" role="region" aria-label="Thao tác với các dòng đã chọn">
+                    <strong>
+                      Đã chọn {fmtNum(pickedRows.length)} dòng, {fmtNum(pickedRows.reduce((n, r) => n + r.quantity, 0))} cái
+                    </strong>
+                    <button
+                      type="button"
+                      className="kk-btn kk-btn-primary kk-btn-sm"
+                      onClick={() => setMoveDlg({ lines: linesOf(pickedRows), to: null })}
+                    >
+                      <ArrowRightLeft size={16} />
+                      Chuyển sang ngăn khác
+                    </button>
+                    <button type="button" className="kk-btn kk-btn-ghost kk-btn-sm" onClick={() => setPicked({ key: pagingKey, set: new Set() })}>
+                      <X size={16} />
+                      Bỏ chọn
+                    </button>
+                  </div>
+                )}
                 <div className="kk-table-scroll">
                   <table className="kk-table kk-table-plain">
                     <thead>
                       <tr>
+                        {canMove && (
+                          <th className="kk-col-check">
+                            <input
+                              type="checkbox"
+                              aria-label="Chọn tất cả các dòng đang có hàng (mọi trang)"
+                              title="Chọn tất cả các dòng đang có hàng (mọi trang)"
+                              checked={allPicked}
+                              disabled={stockRows.length === 0}
+                              ref={(el) => {
+                                if (el) el.indeterminate = !allPicked && pickedRows.length > 0
+                              }}
+                              onChange={togglePickAll}
+                            />
+                          </th>
+                        )}
                         <th>Linh kiện</th>
                         {includeSub && selectedKids.length > 0 && <th>Nằm ở</th>}
                         <th className="is-num">Số lượng</th>
                         <th>Trạng thái</th>
+                        {(canMove || (canEdit && moves.homesReady)) && (
+                          <th className="kk-mv-rowact">
+                            <span className="kk-mv-sr">Thao tác</span>
+                          </th>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
                       {pageRows.map((r) => (
-                        <tr key={r.key} onClick={() => openComponent(r.comp.id)}>
+                        <tr key={r.key} className={r.homeOnly ? 'kk-mv-homerow' : pickedSet.has(r.key) ? 'is-selected' : ''} onClick={() => openComponent(r.comp.id)}>
+                          {canMove && (
+                            <td className="kk-col-check" onClick={(e) => e.stopPropagation()}>
+                              {!r.homeOnly && (
+                                <input
+                                  type="checkbox"
+                                  aria-label={`Chọn ${r.comp.part_number}`}
+                                  checked={pickedSet.has(r.key)}
+                                  onChange={() => togglePick(r.key)}
+                                />
+                              )}
+                            </td>
+                          )}
                           <td data-label="Linh kiện" className="kk-cell-main">
                             <div className="kk-cell-media">
                               <RowThumb url={r.comp.image_url} />
@@ -364,6 +503,19 @@ export default function LocationsPage() {
                                   {r.comp.part_number}
                                 </button>
                                 <span className="kk-cell-name">{r.comp.name}</span>
+                                {r.homeOnly ? (
+                                  <span className="kk-mv-homechip kk-mv-homechip-empty">
+                                    <MapPin size={12} aria-hidden="true" />
+                                    Chỗ cất, chưa có hàng ở đây
+                                  </span>
+                                ) : (
+                                  r.isHome && (
+                                    <span className="kk-mv-homechip" title="Chỗ cất mặc định của linh kiện này">
+                                      <MapPin size={12} aria-hidden="true" />
+                                      Chỗ cất
+                                    </span>
+                                  )
+                                )}
                               </div>
                             </div>
                           </td>
@@ -374,11 +526,39 @@ export default function LocationsPage() {
                           <td data-label="Trạng thái">
                             <StatusChip status={r.comp.status} />
                           </td>
+                          {(canMove || (canEdit && moves.homesReady)) && (
+                            <td className="kk-mv-rowact" onClick={(e) => e.stopPropagation()}>
+                              {r.homeOnly ? (
+                                <button
+                                  type="button"
+                                  className="kk-mv-rowbtn"
+                                  title="Bỏ chỗ cất mặc định ở đây"
+                                  onClick={() => unassign(r)}
+                                >
+                                  <MapPinOff size={14} aria-hidden="true" />
+                                  Bỏ gán
+                                </button>
+                              ) : (
+                                canMove && (
+                                  <button
+                                    type="button"
+                                    className="kk-mv-rowbtn"
+                                    title="Chuyển sang ngăn khác"
+                                    onClick={() => setMoveDlg({ lines: linesOf([r]), to: null })}
+                                  >
+                                    <ArrowRightLeft size={14} aria-hidden="true" />
+                                    Chuyển đi
+                                  </button>
+                                )
+                              )}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+                </>
               )}
               {rows.length > PAGE_SIZE && (
                 <div className="kk-pager">
@@ -415,6 +595,8 @@ export default function LocationsPage() {
         </div>
       )}
 
+      {moveDlg && <MoveDialog lines={moveDlg.lines} toLocationId={moveDlg.to} onClose={() => setMoveDlg(null)} />}
+      {homeDlg && selected && <HomeDialog location={selected} onClose={() => setHomeDlg(false)} />}
       {dialog?.kind === 'add' && (
         <NameDialog
           title={`Thêm ${levelName(dialog.loc ? dialog.loc.depth + 1 : 0)}`}

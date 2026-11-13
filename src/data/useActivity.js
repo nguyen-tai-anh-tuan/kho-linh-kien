@@ -10,7 +10,7 @@ import { fetchAll, friendlyError } from '../lib/api'
  */
 
 /**
- * byComponent: Map id -> [{ t, type, quantity, delta }] xếp từ mới tới cũ.
+ * byComponent: Map id -> [{ t, type, quantity, delta, from?, to? }] xếp từ mới tới cũ (type 'move' = chuyển vị trí).
  * at: mốc "bây giờ" lúc tải xong, dùng để tính "7 ngày qua", "2 ngày trước"...
  */
 export function useActivity(version) {
@@ -18,23 +18,46 @@ export function useActivity(version) {
 
   useEffect(() => {
     let alive = true
-    fetchAll(() =>
+    // Các lần chuyển vị trí (sql/19_move_stock.sql). Chưa chạy file đó thì coi như không có.
+    const movesQuery = fetchAll(() =>
       supabase
-        .from('transactions')
-        .select('id,component_id,type,quantity,delta,created_at')
+        .from('stock_moves')
+        .select('id,component_id,quantity,from_location_id,to_location_id,created_at')
         .order('created_at', { ascending: false })
         .order('id'),
-    )
-      .then((rows) => {
+    ).catch(() => [])
+    Promise.all([
+      fetchAll(() =>
+        supabase
+          .from('transactions')
+          .select('id,component_id,type,quantity,delta,created_at')
+          .order('created_at', { ascending: false })
+          .order('id'),
+      ),
+      movesQuery,
+    ])
+      .then(([rows, moveRows]) => {
         if (!alive) return
         const byComponent = new Map()
-        for (const r of rows) {
-          const t = new Date(r.created_at).getTime()
-          if (!Number.isFinite(t)) continue
-          const list = byComponent.get(r.component_id) ?? []
-          list.push({ t, type: r.type, quantity: r.quantity, delta: r.delta })
-          byComponent.set(r.component_id, list)
+        const push = (componentId, e) => {
+          if (!Number.isFinite(e.t)) return
+          const list = byComponent.get(componentId) ?? []
+          list.push(e)
+          byComponent.set(componentId, list)
         }
+        for (const r of rows) {
+          push(r.component_id, { t: new Date(r.created_at).getTime(), type: r.type, quantity: r.quantity, delta: r.delta })
+        }
+        for (const m of moveRows) {
+          push(m.component_id, {
+            t: new Date(m.created_at).getTime(),
+            type: 'move',
+            quantity: m.quantity,
+            from: m.from_location_id,
+            to: m.to_location_id,
+          })
+        }
+        if (moveRows.length) for (const list of byComponent.values()) list.sort((x, y) => y.t - x.t)
         setState({ status: 'ready', byComponent, error: null, at: Date.now() })
       })
       .catch((err) => {

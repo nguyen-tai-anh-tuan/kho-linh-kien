@@ -70,6 +70,20 @@ async function loadAlternates() {
   return { ready: true, rows: res.data }
 }
 
+/** Chỗ cất mặc định + sổ chuyển vị trí (sql/19_move_stock.sql). Chưa chạy file đó thì ready = false. */
+async function loadMoveSupport() {
+  const [homes, moves] = await Promise.all([
+    fetchAll(() =>
+      supabase.from('components').select('id,home_location_id').not('home_location_id', 'is', null).order('id'),
+    ).then(
+      (rows) => ({ ready: true, rows }),
+      () => ({ ready: false, rows: [] }),
+    ),
+    supabase.from('stock_moves').select('id').limit(1),
+  ])
+  return { homesReady: homes.ready, homeRows: homes.rows, movesReady: !moves.error }
+}
+
 export function DataProvider({ children }) {
   const [raw, setRaw] = useState({
     components: [],
@@ -79,6 +93,7 @@ export function DataProvider({ children }) {
     projects: [],
     levels: { ready: false, defaultMin: 0, rows: [] },
     alternates: { ready: false, rows: [] },
+    moveSupport: { homesReady: false, homeRows: [], movesReady: false },
   })
   const [status, setStatus] = useState({ loading: true, refreshing: false, error: null })
   const [version, setVersion] = useState(0)
@@ -92,7 +107,7 @@ export function DataProvider({ children }) {
         if (res.error) throw res.error
         return res.data
       }
-      const [components, stock, categories, locations, projects, levels, alternates] = await Promise.all([
+      const [components, stock, categories, locations, projects, levels, alternates, moveSupport] = await Promise.all([
         fetchAll(() => supabase.from('component_totals').select('*').order('id')),
         fetchAll(() =>
           supabase
@@ -110,10 +125,11 @@ export function DataProvider({ children }) {
         loadProjects(),
         loadLevels(),
         loadAlternates(),
+        loadMoveSupport(),
       ])
       if (!alive.current) return
       setCategoryTree(categories.tree)
-      setRaw({ components, stock, categories: categories.rows, locations, projects, levels, alternates })
+      setRaw({ components, stock, categories: categories.rows, locations, projects, levels, alternates, moveSupport })
       setVersion((v) => v + 1)
       setStatus({ loading: false, refreshing: false, error: null })
     } catch (error) {
@@ -214,7 +230,15 @@ export function DataProvider({ children }) {
         .filter((x) => x.comp)
     const alternates = { ready: raw.alternates.ready, of: alternatesOf, note: (id) => altNote.get(id) ?? '' }
 
+    // Chỗ cất mặc định: linh kiện -> vị trí (chỉ những vị trí còn tồn tại)
+    const homeOf = new Map(
+      raw.moveSupport.homeRows.filter((r) => locationsById.has(r.home_location_id)).map((r) => [r.id, r.home_location_id]),
+    )
+    const moves = { ready: raw.moveSupport.movesReady, homesReady: raw.moveSupport.homesReady }
+
     return {
+      homeOf,
+      moves,
       components,
       archivedComponents,
       alternates,

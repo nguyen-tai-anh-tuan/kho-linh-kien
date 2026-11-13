@@ -1,13 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { ArrowDownToLine, ArrowUpFromLine, ChevronLeft, ChevronRight, Download, Loader2, SlidersHorizontal } from 'lucide-react'
+import {
+  ArrowDownToLine,
+  ArrowRightLeft,
+  ArrowUpFromLine,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Loader2,
+  SlidersHorizontal,
+} from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
 import { useTx } from '../TxContext'
 import { useShell } from '../ShellContext'
 import { useToast } from '../ui/Toast'
 import { ComponentPicker, EmptyState, RowThumb, Skeleton } from '../ui/common'
-import { fetchAll, friendlyError } from '../lib/api'
+import { fetchAll, friendlyError, isMissingSchema } from '../lib/api'
 import { datedName, downloadXlsx } from '../lib/xlsx'
 import { buildTree, subtreeIds } from '../lib/tree'
 import { fmtDateTime, fmtNum } from '../lib/format'
@@ -18,7 +27,24 @@ const TYPES = {
   in: { label: 'Nhập', Icon: ArrowDownToLine },
   out: { label: 'Xuất', Icon: ArrowUpFromLine },
   adjust: { label: 'Điều chỉnh', Icon: SlidersHorizontal },
+  move: { label: 'Chuyển vị trí', Icon: ArrowRightLeft },
 }
+
+// Lịch sử gộp có cả các lần chuyển vị trí (sql/19_move_stock.sql). Chưa có thì dùng lịch sử cũ.
+const FULL_FEED = 'history_feed'
+const OLD_FEED = 'transactions_feed'
+
+/** Chạy truy vấn trên lịch sử gộp; database chưa có view đó thì chạy lại trên lịch sử cũ */
+async function onFeed(useFull, build) {
+  if (useFull) {
+    const res = await build(FULL_FEED)
+    if (!res.error || !isMissingSchema(res.error)) return { ...res, full: true }
+  }
+  return { ...(await build(OLD_FEED)), full: false }
+}
+
+/** Vị trí của một dòng: chuyển vị trí thì "ngăn cũ → ngăn mới" */
+const placeText = (t) => (t.type === 'move' ? `${t.location_path ?? '?'} → ${t.to_location_path ?? '?'}` : t.location_path)
 
 /** 'YYYY-MM-DD' (giờ máy người dùng) -> mốc thời gian ISO, lệch thêm số ngày nếu cần */
 function dayStart(isoDate, addDays = 0) {
@@ -28,12 +54,14 @@ function dayStart(isoDate, addDays = 0) {
   return d.toISOString()
 }
 
-function applyFilters(query, f) {
+function applyFilters(query, f, full = false) {
   let q = query
   if (f.type) q = q.eq('type', f.type)
   if (f.comp) q = q.eq('component_id', f.comp)
   if (f.proj) q = q.eq('project_id', f.proj)
-  if (f.locIds) q = q.in('location_id', f.locIds)
+  // Lịch sử gộp: lần chuyển vị trí khớp khi ngăn cũ HOẶC ngăn mới nằm trong vị trí đang lọc
+  if (f.locIds && full) q = q.or(`location_id.in.(${f.locIds.join(',')}),to_location_id.in.(${f.locIds.join(',')})`)
+  else if (f.locIds) q = q.in('location_id', f.locIds)
   const from = f.from && dayStart(f.from)
   const to = f.to && dayStart(f.to, 1)
   if (from) q = q.gte('created_at', from)
@@ -42,7 +70,7 @@ function applyFilters(query, f) {
 }
 
 export default function HistoryPage() {
-  const { locations, projects, projectCode, componentsById, version } = useData()
+  const { locations, projects, projectCode, componentsById, version, moves } = useData()
   const { openTx } = useTx()
   const { openComponent, canEdit } = useShell()
   const toast = useToast()
@@ -67,8 +95,12 @@ export default function HistoryPage() {
   useEffect(() => {
     let off = false
     setState((s) => ({ ...s, status: 'loading' }))
-    applyFilters(supabase.from('transactions_feed').select('*', { count: 'exact' }), filters)
-      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+    onFeed(moves.ready, (view) =>
+      applyFilters(supabase.from(view).select('*', { count: 'exact' }), filters, view === FULL_FEED).range(
+        page * PAGE_SIZE,
+        (page + 1) * PAGE_SIZE - 1,
+      ),
+    )
       .then(({ data, count, error }) => {
         if (off) return
         // Trang đang xem không còn tồn tại (vd: vừa đổi bộ lọc ở tab khác): quay về trang đầu
@@ -79,7 +111,7 @@ export default function HistoryPage() {
     return () => {
       off = true
     }
-  }, [filters, page, version, attempt])
+  }, [filters, page, version, attempt, moves.ready])
 
   function setParam(key, value) {
     setParams(
@@ -110,7 +142,9 @@ export default function HistoryPage() {
     if (exporting) return
     setExporting(true)
     try {
-      const all = await fetchAll(() => applyFilters(supabase.from('transactions_feed').select('*'), filters))
+      const probe = await onFeed(moves.ready, (view) => supabase.from(view).select('id').limit(1))
+      const view = probe.full ? FULL_FEED : OLD_FEED
+      const all = await fetchAll(() => applyFilters(supabase.from(view).select('*'), filters, probe.full))
       const tone = { in: 'ok', out: 'warn' }
       await downloadXlsx({
         filename: datedName('lich-su-kho'),
@@ -125,7 +159,7 @@ export default function HistoryPage() {
           { header: 'Tên', value: (t) => t.component_name, width: 32, wrap: true },
           { header: 'Số lượng', value: (t) => t.quantity, type: 'int', width: 10 },
           { header: 'Thay đổi tồn', value: (t) => t.delta, type: 'int', width: 12 },
-          { header: 'Vị trí', value: (t) => t.location_path, width: 26, wrap: true },
+          { header: 'Vị trí', value: placeText, width: 26, wrap: true },
           { header: 'Mã dự án', value: (t) => projectCode(t.project_id), width: 11 },
           { header: 'Dự án', value: (t) => t.project_name, width: 22, wrap: true },
           { header: 'Người thực hiện', value: (t) => t.actor_name, width: 18 },
@@ -152,7 +186,9 @@ export default function HistoryPage() {
           <p>
             {status === 'ready'
               ? `${fmtNum(count)} giao dịch${hasFilter ? ' khớp bộ lọc' : ''}`
-              : 'Mọi lần nhập, xuất và điều chỉnh kho'}
+              : moves.ready
+                ? 'Mọi lần nhập, xuất, điều chỉnh và chuyển vị trí'
+                : 'Mọi lần nhập, xuất và điều chỉnh kho'}
           </p>
         </div>
         <div className="kk-quick">
@@ -168,7 +204,9 @@ export default function HistoryPage() {
           <label htmlFor="hf-type">Loại</label>
           <select id="hf-type" value={type} onChange={(e) => setParam('type', e.target.value)}>
             <option value="">Mọi loại</option>
-            {Object.entries(TYPES).map(([key, t]) => (
+            {Object.entries(TYPES)
+              .filter(([key]) => key !== 'move' || moves.ready)
+              .map(([key, t]) => (
               <option key={key} value={key}>
                 {t.label}
               </option>
@@ -297,7 +335,7 @@ export default function HistoryPage() {
                         <td data-label="Số lượng" className="is-num kk-strong-num">
                           <Quantity t={t} />
                         </td>
-                        <td data-label="Vị trí">{t.location_path || '—'}</td>
+                        <td data-label="Vị trí">{placeText(t) || '—'}</td>
                         <td data-label="Dự án">
                           {!t.project_name ? (
                             '—'
@@ -355,6 +393,7 @@ export default function HistoryPage() {
 }
 
 function Quantity({ t }) {
+  if (t.type === 'move') return <span>{fmtNum(t.quantity)}</span>
   if (t.type === 'in') return <span className="kk-num-up">+{fmtNum(t.quantity)}</span>
   if (t.type === 'out') return <span className="kk-num-down">−{fmtNum(t.quantity)}</span>
   const d = t.delta
