@@ -1,0 +1,396 @@
+/* =====================================================================
+   Trang Linh kiện: bộ lọc nâng cao, lọc nhanh, nhãn bộ lọc,
+   cột hoạt động gần nhất, vị trí kèm số lượng, nút nhập / xuất nhanh.
+   Mọi lớp đều có tiền tố kk-cp- nên không ảnh hưởng các trang khác.
+   ===================================================================== */
+
+.kk-cp-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ----- Thanh lọc ----- */
+.kk-cp-toolbar {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+.kk-cp-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.kk-cp-row .kk-search {
+  flex: 1 1 260px;
+  max-width: none;
+}
+.kk-cp-row2 {
+  gap: 10px 16px;
+}
+.kk-cp-advbtn {
+  padding: 0 12px;
+  font-weight: 600;
+}
+.kk-cp-advbtn.is-set {
+  border-color: var(--primary);
+  font-weight: 700;
+}
+.kk-cp-advbtn svg:last-child {
+  transition: transform 0.15s;
+}
+.kk-cp-flip {
+  transform: rotate(180deg);
+}
+.kk-cp-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 99px;
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+/* Nút trạng thái: Tất cả / Còn hàng / Sắp hết / Hết hàng */
+.kk-cp-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--kk-soft);
+}
+.kk-cp-seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+.kk-cp-seg-btn:hover {
+  color: var(--text);
+}
+.kk-cp-seg-btn.is-on {
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.16);
+}
+.kk-cp-seg-n {
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+  font-size: 0.75rem;
+  text-align: center;
+}
+.kk-cp-seg-ok.is-on .kk-cp-seg-n { background: var(--ok-bg); color: var(--ok); }
+.kk-cp-seg-low.is-on .kk-cp-seg-n { background: var(--kk-warn-bg); color: var(--kk-warn); }
+.kk-cp-seg-out.is-on .kk-cp-seg-n { background: var(--danger-bg); color: var(--danger); }
+
+/* Lọc nhanh */
+.kk-cp-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.kk-cp-presets-label {
+  margin-right: 2px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.kk-cp-pill {
+  min-height: 30px;
+  padding: 2px 12px;
+  font-size: 0.82rem;
+}
+.kk-cp-arc {
+  margin-left: auto;
+}
+
+/* Bảng lọc nâng cao */
+.kk-cp-adv {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+.kk-cp-group {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.kk-cp-group legend {
+  padding: 0 6px;
+  margin-left: -6px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--muted);
+}
+.kk-cp-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.kk-cp-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.kk-cp-pair label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.kk-cp-pair label span {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.kk-cp-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* Nhãn bộ lọc đang bật */
+.kk-cp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: -2px 0 12px;
+}
+.kk-cp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 3px 4px 3px 12px;
+  border-radius: 99px;
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, var(--border));
+  background: var(--kk-soft);
+  color: var(--kk-link);
+  font-size: 0.8rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.kk-cp-chip button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: inherit;
+}
+.kk-cp-chip button:hover {
+  background: color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+/* ----- Bảng ----- */
+.kk-cp-title {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.kk-cp-new {
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--kk-gold);
+  color: #3b2a00;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* Vị trí kèm số lượng từng chỗ */
+.kk-cp-locs {
+  display: grid;
+  gap: 4px;
+  min-width: 150px;
+  max-width: 240px;
+}
+.kk-cp-loc {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.kk-cp-loc-path {
+  min-width: 0;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+.kk-cp-loc-qty {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--kk-soft);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+.kk-cp-loc.is-hit .kk-cp-loc-path {
+  font-weight: 700;
+  color: var(--kk-link);
+}
+.kk-cp-locs .kk-more {
+  font-size: 0.78rem;
+}
+
+/* Hoạt động gần nhất */
+.kk-col-activity {
+  min-width: 130px;
+}
+.kk-cp-ev {
+  display: grid;
+  gap: 1px;
+}
+.kk-cp-ev-what {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.kk-cp-ev-in svg { color: var(--kk-in); }
+.kk-cp-ev-out svg { color: var(--kk-out); }
+.kk-cp-ev-adjust svg { color: var(--kk-link); }
+.kk-cp-ev-new svg { color: var(--kk-gold); }
+.kk-cp-ev small,
+.kk-cp-muted {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* Nút nhập / xuất nhanh: hiện khi rê chuột hoặc dùng bàn phím */
+.kk-col-rowact {
+  width: 84px;
+  padding-left: 4px !important;
+  padding-right: 10px !important;
+}
+.kk-cp-rowact {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.kk-cp-table tbody tr:hover .kk-cp-rowact,
+.kk-cp-table tbody tr:focus-within .kk-cp-rowact {
+  opacity: 1;
+}
+.kk-cp-rowact .kk-icon-btn {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+.kk-cp-act-in { color: var(--kk-in) !important; }
+.kk-cp-act-out { color: var(--kk-out) !important; }
+.kk-cp-act-in:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--kk-in) 14%, var(--card)) !important;
+}
+.kk-cp-act-out:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--kk-out) 14%, var(--card)) !important;
+}
+/* Máy cảm ứng không rê chuột được: luôn hiện */
+@media (hover: none) {
+  .kk-cp-rowact {
+    opacity: 1;
+  }
+}
+
+/* Chọn số dòng mỗi trang */
+.kk-cp-pager {
+  gap: 6px;
+}
+.kk-cp-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 10px;
+  white-space: nowrap;
+}
+.kk-cp-size select {
+  width: auto !important;
+  height: 36px !important;
+  padding: 0 8px !important;
+}
+
+@media (max-width: 1040px) {
+  .kk-cp-arc {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .kk-cp-row select,
+  .kk-cp-advbtn {
+    flex: 1 1 140px;
+    max-width: none;
+  }
+  .kk-cp-seg {
+    width: 100%;
+  }
+  .kk-cp-seg-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding: 0 8px;
+  }
+  .kk-cp-adv {
+    grid-template-columns: 1fr;
+  }
+  .kk-cp-locs {
+    max-width: 62%;
+    min-width: 0;
+    text-align: right;
+  }
+  .kk-cp-ev {
+    text-align: right;
+  }
+  /* Thẻ trên điện thoại: nút nhập / xuất nằm ở góc dưới, luôn hiện */
+  .kk-cp-table td.kk-col-rowact {
+    width: auto;
+    padding: 6px 0 0 !important;
+  }
+  .kk-cp-rowact {
+    justify-content: flex-end;
+    opacity: 1;
+  }
+  .kk-cp-pager {
+    flex-wrap: wrap;
+  }
+}
+
+/* Ô chọn trong bảng lọc nâng cao trải hết bề ngang nhóm */
+.kk-cp-group select {
+  width: 100% !important;
+  max-width: none;
+}
