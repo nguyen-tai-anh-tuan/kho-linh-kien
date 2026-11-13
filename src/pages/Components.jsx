@@ -43,11 +43,10 @@ const COLUMNS = [
   { key: 'part_number', title: 'Linh kiện', sortable: true },
   { key: 'package', title: 'Package', sortable: true, cls: 'kk-col-pkg' },
   { key: 'locations', title: 'Vị trí', cls: 'kk-col-loc' },
-  { key: 'total_quantity', title: 'Tồn kho', sortable: true },
+  // Cột gộp (cho bảng gọn, không phải kéo ngang): mỗi cột có thêm một nút xếp phụ (extra)
+  { key: 'total_quantity', title: 'Tồn kho', sortable: true, extra: { key: 'status', title: 'Trạng thái' } },
   { key: 'activity', title: 'Hoạt động gần nhất', sortable: true, cls: 'kk-col-activity', firstDir: 'desc' },
-  { key: 'unit_price', title: 'Đơn giá', sortable: true, cls: 'kk-col-price', num: true },
-  { key: 'stock_value', title: 'Giá trị', sortable: true, cls: 'kk-col-price', num: true },
-  { key: 'status', title: 'Trạng thái', sortable: true },
+  { key: 'stock_value', title: 'Giá trị', sortable: true, cls: 'kk-col-money', num: true, extra: { key: 'unit_price', title: 'Đơn giá' } },
 ]
 
 /** Lọc theo hoạt động. types: loại giao dịch trong lịch sử nhập / xuất */
@@ -810,32 +809,43 @@ export default function ComponentsPage() {
                         onChange={toggleAll}
                       />
                     </th>
-                    {COLUMNS.map((col) => (
-                      <th
-                        key={col.key}
-                        className={`${col.cls ?? ''} ${col.num ? 'is-num' : ''}`}
-                        aria-sort={
-                          sort.key === col.key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : col.sortable ? 'none' : undefined
-                        }
-                      >
-                        {col.sortable ? (
-                          <button type="button" className="kk-sort" onClick={() => toggleSort(col)}>
-                            {col.title}
-                            {sort.key === col.key ? (
-                              sort.dir === 'asc' ? (
-                                <ArrowUp size={14} />
-                              ) : (
-                                <ArrowDown size={14} />
-                              )
+                    {COLUMNS.map((col) => {
+                      const keys = [col.key, col.extra?.key].filter(Boolean)
+                      const sortBtn = (c, small) => (
+                        <button type="button" className={`kk-sort ${small ? 'kk-cp-sort-sub' : ''}`} onClick={() => toggleSort(c)}>
+                          {c.title}
+                          {sort.key === c.key ? (
+                            sort.dir === 'asc' ? (
+                              <ArrowUp size={small ? 12 : 14} />
                             ) : (
-                              <ArrowDownUp size={14} className="kk-sort-idle" />
-                            )}
-                          </button>
-                        ) : (
-                          col.title
-                        )}
-                      </th>
-                    ))}
+                              <ArrowDown size={small ? 12 : 14} />
+                            )
+                          ) : (
+                            <ArrowDownUp size={small ? 12 : 14} className="kk-sort-idle" />
+                          )}
+                        </button>
+                      )
+                      return (
+                        <th
+                          key={col.key}
+                          className={`${col.cls ?? ''} ${col.num ? 'is-num' : ''}`}
+                          aria-sort={
+                            keys.includes(sort.key) ? (sort.dir === 'asc' ? 'ascending' : 'descending') : col.sortable ? 'none' : undefined
+                          }
+                        >
+                          {!col.sortable ? (
+                            col.title
+                          ) : col.extra ? (
+                            <span className="kk-cp-th2">
+                              {sortBtn(col)}
+                              {sortBtn(col.extra, true)}
+                            </span>
+                          ) : (
+                            sortBtn(col)
+                          )}
+                        </th>
+                      )
+                    })}
                     {showRowActs && (
                       <th className="kk-col-rowact">
                         <span className="kk-cp-sr">Nhập / xuất nhanh</span>
@@ -920,19 +930,22 @@ export default function ComponentsPage() {
                           )}
                         </td>
                         <td data-label="Tồn kho">
-                          <StockBar qty={c.total_quantity} min={c.min_stock} status={c.status} />
+                          <div className="kk-cp-stockcell">
+                            <StockBar qty={c.total_quantity} min={c.min_stock} status={c.status} />
+                            <StatusChip status={c.status} />
+                          </div>
                         </td>
                         <td data-label="Hoạt động" className="kk-col-activity">
                           <ActivityCell ev={ev} loading={activity.status === 'loading'} periodSum={periodSum} act={act} now={nowMs} />
                         </td>
-                        <td data-label="Đơn giá" className="kk-col-price is-num">
-                          <ComponentPrice comp={c} />
-                        </td>
-                        <td data-label="Giá trị" className="kk-col-price is-num">
-                          {Number(c.unit_price) > 0 ? fmtMoneyFull(c.stock_value) : '—'}
-                        </td>
-                        <td data-label="Trạng thái">
-                          <StatusChip status={c.status} />
+                        <td data-label="Giá trị" className="kk-col-money is-num">
+                          <div className="kk-cp-money">
+                            <strong>{Number(c.unit_price) > 0 ? fmtMoneyFull(c.stock_value) : '—'}</strong>
+                            <span className="kk-cp-unit">
+                              <span className="kk-cp-unit-label">Đơn giá</span>
+                              <ComponentPrice comp={c} />
+                            </span>
+                          </div>
                         </td>
                         {showRowActs && (
                           <td className="kk-col-rowact" onClick={(e) => e.stopPropagation()}>

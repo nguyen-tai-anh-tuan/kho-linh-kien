@@ -394,3 +394,90 @@
   width: 100% !important;
   max-width: none;
 }
+
+/* =====================================================================
+   Bảng gọn: gộp Tồn kho + Trạng thái và Giá trị + Đơn giá để vừa màn hình,
+   không phải kéo ngang
+   ===================================================================== */
+@media (min-width: 721px) {
+  .kk-cp-table th,
+  .kk-cp-table td {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .kk-cp-table .kk-col-check {
+    width: 40px;
+    padding-left: 14px;
+  }
+  .kk-cp-table .kk-cell-main {
+    min-width: 220px;
+  }
+  .kk-cp-table .kk-cell-name {
+    max-width: 280px;
+  }
+  .kk-cp-locs {
+    min-width: 130px;
+    max-width: 210px;
+  }
+  .kk-col-activity {
+    min-width: 120px;
+  }
+}
+
+/* Tiêu đề cột gộp: tên chính, dưới là nút xếp phụ nhỏ */
+.kk-cp-th2 {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.is-num .kk-cp-th2 {
+  align-items: flex-end;
+}
+.kk-cp-sort-sub {
+  font-size: 0.72rem;
+  font-weight: 600 !important;
+}
+
+/* Tồn kho + trạng thái */
+.kk-cp-stockcell {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+.kk-cp-stockcell .kk-stock-bar {
+  width: 72px;
+}
+.kk-cp-stockcell .kk-status {
+  padding: 1px 8px;
+  font-size: 0.72rem;
+}
+
+/* Giá trị tồn + đơn giá */
+.kk-col-money {
+  white-space: nowrap;
+}
+.kk-cp-money {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+.kk-cp-money strong {
+  font-variant-numeric: tabular-nums;
+}
+.kk-cp-unit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .kk-cp-stockcell {
+    justify-items: end;
+  }
+  .kk-cp-unit-label {
+    display: none;
+  }
+}
