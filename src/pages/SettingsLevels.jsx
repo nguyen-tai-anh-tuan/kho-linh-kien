@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, BellRing, Loader2, RotateCcw, Trash2 } from 'lucide-react'
+import { AlertTriangle, BellRing, ChevronDown, ChevronRight, Loader2, RotateCcw, Search, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
 import { useShell } from '../ShellContext'
@@ -7,10 +7,11 @@ import { useToast } from '../ui/Toast'
 import { ConfirmDialog } from '../ui/dialogs'
 import { CategoryPicker, Field, QtyStepper, Skeleton } from '../ui/common'
 import { friendlyError, mustChange } from '../lib/api'
-import { fmtNum } from '../lib/format'
+import { fmtNum, normalize } from '../lib/format'
 import { subtreeIds } from '../lib/tree'
 
-const MAX_OWN = 12
+const OWN_PREVIEW = 5 // số dòng hiện trước khi bấm "Xem thêm"
+const SEARCH_FROM = 8 // nhiều hơn số này thì hiện ô tìm
 const validLevel = (v) => v !== '' && Number.isInteger(Number(v)) && Number(v) >= 0
 
 /**
@@ -26,10 +27,18 @@ export default function SettingsLevels() {
   const [target, setTarget] = useState('')
   const [level, setLevel] = useState(10)
   const [adding, setAdding] = useState(false)
-  const [dialog, setDialog] = useState(null) // { kind: 'reset' } | { kind: 'clear', category }
+  const [dialog, setDialog] = useState(null) // { kind: 'reset' } | { kind: 'clear', category } | { kind: 'clearOwn', component }
+  const [ownOpen, setOwnOpen] = useState(false) // danh sách linh kiện có mức riêng: mặc định thu gọn
+  const [ownAll, setOwnAll] = useState(false)
+  const [ownQuery, setOwnQuery] = useState('')
 
   const withLevel = categories.filter((c) => levels.byCategory.has(c.id))
   const own = allComponents.filter((c) => c.min_stock_own !== null && c.min_stock_own !== undefined)
+  const ownKey = normalize(ownQuery)
+  const ownFiltered = ownKey
+    ? own.filter((c) => normalize(`${c.part_number} ${categoriesById.get(c.category_id)?.path ?? ''}`).includes(ownKey))
+    : own
+  const ownShown = ownAll || ownKey ? ownFiltered : ownFiltered.slice(0, OWN_PREVIEW)
   const generalValue = general ?? levels.defaultMin
   const generalChanged = validLevel(generalValue) && Number(generalValue) !== levels.defaultMin
 
@@ -76,6 +85,14 @@ export default function SettingsLevels() {
     if (await saveCategory(category, Number(level))) setTarget('')
     setAdding(false)
   }
+
+  const saveOwn = (component, value) =>
+    run(
+      async () => mustChange(await supabase.from('components').update({ min_stock: value }).eq('id', component.id).select('id')),
+      value === null
+        ? `Đã bỏ mức riêng của ${component.part_number}.`
+        : `Đã đặt mức ${fmtNum(value)} cho ${component.part_number}.`,
+    )
 
   async function resetOwn() {
     const changed = mustChange(await supabase.from('components').update({ min_stock: null }).not('min_stock', 'is', null).select('id'))
@@ -208,22 +225,89 @@ export default function SettingsLevels() {
             </p>
           ) : (
             <>
-              <p className="kk-muted-text">
-                {fmtNum(own.length)} linh kiện đang dùng mức riêng, không theo mức chung hay danh mục:
-              </p>
-              <div className="kk-level-own">
-                {own.slice(0, MAX_OWN).map((c) => (
-                  <button key={c.id} type="button" className="kk-pill" onClick={() => openComponent(c.id)}>
-                    {c.part_number}: {fmtNum(c.min_stock_own)}
-                  </button>
-                ))}
-                {own.length > MAX_OWN && <span className="kk-muted-text">và {fmtNum(own.length - MAX_OWN)} linh kiện khác</span>}
-              </div>
-              {isAdmin && (
-                <button type="button" className="kk-btn kk-btn-outline kk-btn-sm kk-level-reset" onClick={() => setDialog({ kind: 'reset' })}>
-                  <RotateCcw size={16} />
-                  Đưa tất cả về mặc định
-                </button>
+              <button
+                type="button"
+                className="kk-level-toggle"
+                aria-expanded={ownOpen}
+                aria-controls="lv-own-list"
+                onClick={() => setOwnOpen((v) => !v)}
+              >
+                <ChevronRight size={18} className={ownOpen ? 'is-open' : ''} aria-hidden="true" />
+                <span>
+                  {fmtNum(own.length)} linh kiện đang dùng mức riêng, không theo mức chung hay danh mục.{' '}
+                  <span className="kk-link">{ownOpen ? 'Ẩn danh sách' : 'Xem danh sách'}</span>
+                </span>
+              </button>
+
+              {ownOpen && (
+                <div id="lv-own-list">
+                  {own.length > SEARCH_FROM && (
+                    <div className="kk-search kk-level-search">
+                      <Search size={18} aria-hidden="true" />
+                      <input
+                        type="search"
+                        value={ownQuery}
+                        placeholder="Tìm linh kiện…"
+                        aria-label="Tìm linh kiện có mức riêng"
+                        onChange={(e) => setOwnQuery(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  {ownFiltered.length === 0 ? (
+                    <p className="kk-muted-text">Không có linh kiện nào khớp "{ownQuery}".</p>
+                  ) : (
+                    <ul className="kk-rows kk-level-rows">
+                      {ownShown.map((c) => {
+                        const cat = categoriesById.get(c.category_id)
+                        return (
+                          <li key={c.id}>
+                            <span className="kk-rows-name">
+                              <button type="button" className="kk-level-name" title={c.part_number} onClick={() => openComponent(c.id)}>
+                                {c.part_number}
+                              </button>
+                              <small>{cat ? cat.path : 'Chưa có danh mục'}</small>
+                            </span>
+                            {isAdmin ? (
+                              <>
+                                <LevelInput
+                                  key={`${c.id}|${c.min_stock_own}`}
+                                  label={`Mức cảnh báo riêng của ${c.part_number}`}
+                                  value={c.min_stock_own}
+                                  onSave={(n) => saveOwn(c, n)}
+                                />
+                                <button
+                                  type="button"
+                                  className="kk-icon-btn kk-c-del"
+                                  aria-label={`Bỏ mức riêng của ${c.part_number}`}
+                                  title="Bỏ mức riêng, quay về mức danh mục hoặc mức chung"
+                                  onClick={() => setDialog({ kind: 'clearOwn', component: c })}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </>
+                            ) : (
+                              <strong className="kk-strong-num">{fmtNum(c.min_stock_own)}</strong>
+                            )}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                  <div className="kk-level-own-foot">
+                    {ownFiltered.length > OWN_PREVIEW && (
+                      <button type="button" className="kk-btn kk-btn-ghost kk-btn-sm" onClick={() => setOwnAll((v) => !v)}>
+                        <ChevronDown size={16} className={ownAll ? 'kk-rot-180' : ''} aria-hidden="true" />
+                        {ownAll ? 'Thu gọn' : `Xem thêm ${fmtNum(ownFiltered.length - OWN_PREVIEW)} linh kiện`}
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <button type="button" className="kk-btn kk-btn-outline kk-btn-sm kk-push-right" onClick={() => setDialog({ kind: 'reset' })}>
+                        <RotateCcw size={16} />
+                        Đưa tất cả về mặc định
+                      </button>
+                    )}
+                  </div>
+                </div>
               )}
             </>
           )}
@@ -238,6 +322,19 @@ export default function SettingsLevels() {
           Icon={Trash2}
           onConfirm={async () => {
             const ok = await saveCategory(dialog.category, null)
+            if (!ok) throw new Error('Chưa bỏ được mức riêng. Bạn thử lại nhé.')
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'clearOwn' && (
+        <ConfirmDialog
+          title={`Bỏ mức riêng của ${dialog.component.part_number}?`}
+          text="Linh kiện này sẽ quay về mức của danh mục, hoặc mức chung."
+          confirmLabel="Bỏ mức riêng"
+          Icon={Trash2}
+          onConfirm={async () => {
+            const ok = await saveOwn(dialog.component, null)
             if (!ok) throw new Error('Chưa bỏ được mức riêng. Bạn thử lại nhé.')
           }}
           onClose={() => setDialog(null)}

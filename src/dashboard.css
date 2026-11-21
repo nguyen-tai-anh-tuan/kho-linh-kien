@@ -3081,15 +3081,65 @@ a.kk-plan-status:hover {
 .kk-level-add > .kk-btn {
   margin-top: 25px;
 }
-.kk-level-own {
+/* Linh kiện có mức riêng: mặc định thu gọn, mở ra thành danh sách dòng */
+.kk-level-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+.kk-level-toggle > svg {
+  flex: none;
+  margin-top: 1px;
+  transition: transform 0.15s ease;
+}
+.kk-level-toggle > svg.is-open {
+  transform: rotate(90deg);
+}
+.kk-level-own-foot svg.kk-rot-180 {
+  transform: rotate(180deg);
+}
+.kk-level-search {
+  max-width: 380px;
+  margin: 6px 0 4px;
+}
+.kk-level-name {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.kk-level-name:hover {
+  color: var(--primary, inherit);
+  text-decoration: underline;
+}
+.kk-level-own-foot {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 8px;
+  margin-top: 10px;
 }
-.kk-level-reset {
-  margin-top: 12px;
+@media (prefers-reduced-motion: reduce) {
+  .kk-level-toggle > svg {
+    transition: none;
+  }
 }
 .kk-dd-note {
   display: block;
