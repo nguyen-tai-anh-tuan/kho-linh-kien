@@ -285,7 +285,7 @@ export function CategoryPicker({ id, value, onChange, placeholder = 'Chưa phân
 
   if (selected) {
     return (
-      <div className="kk-picked">
+      <div className="kk-picked" title={selected.path}>
         <div className="kk-picked-text">
           <strong>{selected.name}</strong>
           {selected.depth > 0 && <span>{selected.path.slice(0, -(selected.name.length + 3))}</span>}
@@ -409,7 +409,7 @@ export function ComponentPicker({ value, onChange, invalid, autoFocus, id }) {
 
   if (selected) {
     return (
-      <div className={`kk-picked ${invalid ? 'is-invalid' : ''}`}>
+      <div className={`kk-picked ${invalid ? 'is-invalid' : ''}`} title={`${selected.part_number}\n${selected.name}`}>
         <div className="kk-picked-text">
           <strong>{selected.part_number}</strong>
           <span>{selected.name}</span>

@@ -1679,11 +1679,19 @@ button.kk-stat:focus-visible {
 .kk-picked-text {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-width: 0;
   line-height: 1.2;
 }
+/* Tên dài thì cắt bằng "…" (rê chuột để xem đủ) để ô không bị tràn */
 .kk-picked-text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 0.9rem;
+}
+.kk-picked > .kk-link {
+  flex: none;
 }
 .kk-picked-text span {
   overflow: hidden;
