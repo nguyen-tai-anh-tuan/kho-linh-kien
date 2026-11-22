@@ -1,5 +1,5 @@
 import { useId, useMemo, useState } from 'react'
-import { AlertTriangle, CheckCircle2, Cpu, XCircle, Minus, Plus, Loader2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Cpu, XCircle, Minus, Pencil, Plus, Loader2 } from 'lucide-react'
 import { useData } from '../data/DataContext'
 import { CategoryMega } from './CategoryMenu'
 import { friendlyError } from '../lib/api'
@@ -77,13 +77,27 @@ export function CategoryChip({ name, tone, title }) {
 }
 
 /** Thanh tồn kho: vạch giữa là mức tối thiểu, thanh đầy ở mức gấp đôi tối thiểu */
-export function StockBar({ qty, min, status }) {
+export function StockBar({ qty, min, status, onEdit, editLabel }) {
   // Chưa đặt mức tối thiểu: vẫn vẽ thanh cho đồng bộ, đầy khi còn hàng và không có vạch giữa
   const pct = min > 0 ? Math.min(100, (qty / (min * 2)) * 100) : qty > 0 ? 100 : 0
   const note = min > 0 ? `Tối thiểu ${fmtNum(min)}` : 'Chưa đặt mức tồn tối thiểu'
   return (
     <div className="kk-stock">
-      <span className="kk-stock-num">{fmtNum(qty)}</span>
+      {onEdit ? (
+        // Bấm số tồn để kiểm kê nhanh (ui/StockEdit.jsx)
+        <button
+          type="button"
+          className="kk-stock-num kk-stock-edit"
+          title="Bấm để kiểm kê: nhập số đếm được"
+          aria-label={`Kiểm kê ${editLabel ?? ''}: đang tồn ${fmtNum(qty)}`}
+          onClick={onEdit}
+        >
+          {fmtNum(qty)}
+          <Pencil size={12} aria-hidden="true" />
+        </button>
+      ) : (
+        <span className="kk-stock-num">{fmtNum(qty)}</span>
+      )}
       <span className="kk-stock-bar" role="img" aria-label={`Tồn ${fmtNum(qty)}. ${note}`} title={note}>
         <i className={`kk-stock-fill kk-fill-${status}`} style={{ width: `${pct}%` }} />
         {min > 0 && <b className="kk-stock-mark" />}

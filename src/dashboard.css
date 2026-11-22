@@ -1254,6 +1254,55 @@ button.kk-stat:focus-visible {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
+.kk-stock-num.kk-stock-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  margin: -2px -6px;
+  border: 1px dashed transparent;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+  cursor: pointer;
+}
+.kk-stock-edit svg {
+  flex: none;
+  opacity: 0.35;
+}
+.kk-stock-edit:hover,
+.kk-stock-edit:focus-visible {
+  border-color: var(--border);
+  background: var(--kk-hover);
+}
+.kk-stock-edit:hover svg,
+.kk-stock-edit:focus-visible svg {
+  opacity: 0.8;
+}
+/* Ô kiểm kê nhanh */
+:is(.kk, .kk-portal) .kk-stock-form .kk-price-row input:not([type='checkbox']) {
+  width: 72px;
+}
+:is(.kk, .kk-portal) .kk-stock-form select {
+  max-width: 190px;
+  height: 32px;
+  padding: 2px 8px;
+  font-size: 0.8rem;
+}
+.kk-stock-delta {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.kk-stock-delta.is-up {
+  color: var(--ok);
+}
+.kk-stock-delta.is-down {
+  color: var(--kk-out);
+}
 .kk-stock-bar {
   position: relative;
   width: 84px;

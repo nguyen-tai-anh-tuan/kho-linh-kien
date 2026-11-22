@@ -22,13 +22,14 @@ import { lastEvent, sumEvents, useActivity } from '../data/useActivity'
 import { useTx } from '../TxContext'
 import MoveDialog from '../MoveDialog'
 import { useShell } from '../ShellContext'
-import { CategoryChip, EmptyState, RowThumb, Skeleton, StatusChip, StockBar } from '../ui/common'
+import { CategoryChip, EmptyState, RowThumb, Skeleton, StatusChip } from '../ui/common'
 import { datedName, stockText, stockTone } from '../lib/xlsx'
 import { useXlsxExport } from '../ui/useXlsxExport'
 import { fmtDate, fmtDateTime, fmtMoneyFull, fmtNum, normalize, timeAgo } from '../lib/format'
 import { matches, parseQuery, quantitiesIn } from '../lib/smartSearch'
 import { StockStatCards, stockStats } from '../ui/stats'
 import { ComponentPrice } from '../ui/PriceEdit'
+import { StockEdit } from '../ui/StockEdit'
 import { packOf, packPrice } from '../lib/price'
 import { CategoryFilter } from '../ui/CategoryMenu'
 import { subtreeIds } from '../lib/tree'
@@ -964,7 +965,7 @@ export default function ComponentsPage() {
                         </td>
                         <td data-label="Tồn kho">
                           <div className="kk-cp-stockcell">
-                            <StockBar qty={c.total_quantity} min={c.min_stock} status={c.status} />
+                            <StockEdit comp={c} preferLocation={loc || undefined} />
                             <StatusChip status={c.status} />
                           </div>
                         </td>
