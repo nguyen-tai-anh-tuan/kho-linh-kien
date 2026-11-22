@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, ArrowUpFromLine, CheckCircle2, ChevronLeft, ChevronRight, CircuitBoard, Download, Eye, RotateCcw, Loader2, Pencil, Plus, Replace, Save, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowUpFromLine, CheckCircle2, ChevronLeft, ChevronRight, CircuitBoard, Download, Eye, RotateCcw, Loader2, PackageCheck, Pencil, Plus, Replace, Save, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { useData } from '../data/DataContext'
 import { useUndoTx } from '../TxContext'
@@ -15,7 +15,7 @@ import { downloadXlsx } from '../lib/xlsx'
 import { fmtNum, normalize } from '../lib/format'
 import { removeProjectFiles } from '../lib/images'
 import { ProjectGallery, useProjectImages } from './ProjectImages'
-import { STAGES, StageBar, StageTag, hasStage } from './ProjectStage'
+import { StageBar, StageFilter, StageTag, hasStage, isDoneStage, stageColor } from './ProjectStage'
 
 // Địa chỉ web Electronics Lab (nơi tạo dự án). Chưa đặt thì giữ nguyên cách tạo dự án cũ.
 const LAB_URL = import.meta.env.VITE_LAB_URL
@@ -178,21 +178,7 @@ export default function ProjectsPage() {
       ) : (
         <div className="kk-split">
           <nav className="kk-card kk-tree-card" aria-label="Danh sách dự án">
-            {projects.some(hasStage) && (
-              <div className="kk-stage-filter">
-                <label htmlFor="prj-stage" className="kk-sr">
-                  Lọc theo tiến độ
-                </label>
-                <select id="prj-stage" value={stageFilter} onChange={(e) => setStageFilter(e.target.value)}>
-                  <option value="">Mọi tiến độ ({fmtNum(projects.length)})</option>
-                  {STAGES.map((name, i) => (
-                    <option key={name} value={i}>
-                      {name} ({fmtNum(projects.filter((p) => p.stage === i).length)})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            {projects.some(hasStage) && <StageFilter projects={projects} value={stageFilter} onChange={setStageFilter} />}
             {listed.length === 0 && <p className="kk-muted-text kk-stage-empty">Không có dự án nào ở bước này.</p>}
             <ul className="kk-pick-list">
               {listed.map((p) => {
@@ -201,11 +187,21 @@ export default function ProjectsPage() {
                 const on = selected?.id === p.id
                 const cover = images.rows.find((r) => r.project_id === p.id && r.slot === 0)
                 const coverUrl = cover ? images.urls.get(cover.thumb_path) : null
+                // Nhãn BOM: dự án xong rồi thì không cần biết đủ/thiếu nữa
+                const bomChip =
+                  own.length === 0
+                    ? { tone: 'is-none', icon: null, text: 'Chưa có BOM', title: 'Dự án chưa có danh sách linh kiện' }
+                    : isDoneStage(p)
+                      ? { tone: 'is-done', icon: <PackageCheck size={12} />, text: 'Đã lắp xong', title: `${own.length} món trong BOM` }
+                      : short > 0
+                        ? { tone: 'is-short', icon: <AlertTriangle size={12} />, text: `Thiếu ${fmtNum(short)}/${fmtNum(own.length)}`, title: `Kho còn thiếu ${short} trong ${own.length} món để lắp 1 bộ` }
+                        : { tone: 'is-ok', icon: <CheckCircle2 size={12} />, text: `${fmtNum(own.length)} món`, title: `Đủ hàng cả ${own.length} món để lắp 1 bộ` }
                 return (
                   <li key={p.id}>
                     <button
                       type="button"
-                      className={`kk-pick kk-pick-media ${on ? 'is-on' : ''}`}
+                      className={`kk-pick kk-pick-media kk-pick-prj ${on ? 'is-on' : ''}`}
+                      style={hasStage(p) ? { '--stage': stageColor(p.stage) } : undefined}
                       aria-current={on ? 'true' : undefined}
                       onClick={() => select(p.id)}
                     >
@@ -217,18 +213,15 @@ export default function ProjectsPage() {
                         </span>
                       )}
                       <span className="kk-pick-text">
-                        <strong>
-                          {p.code && <span className="kk-prj">{p.code}</span>}
-                          {p.name}
-                        </strong>
-                        <StageTag project={p} />
-                        <small className={short > 0 ? 'kk-warn-text' : ''}>
-                          {own.length === 0
-                            ? 'Chưa có BOM'
-                            : short > 0
-                              ? `${fmtNum(own.length)} món, thiếu ${fmtNum(short)}`
-                              : `${fmtNum(own.length)} món, đủ hàng`}
-                        </small>
+                        {p.code && <span className="kk-pick-code">{p.code}</span>}
+                        <strong className="kk-pick-name">{p.name}</strong>
+                        <span className="kk-pick-chips">
+                          <StageTag project={p} />
+                          <span className={`kk-bom-chip ${bomChip.tone}`} title={bomChip.title}>
+                            {bomChip.icon}
+                            {bomChip.text}
+                          </span>
+                        </span>
                       </span>
                     </button>
                   </li>
